@@ -141,9 +141,14 @@ struct EmbeddedYouTubePlayer: NSViewRepresentable {
               player=new YT.Player('p',{videoId:'\(videoID)',
                 playerVars:{autoplay:1,mute:1,controls:0,disablekb:1,fs:0,rel:0,iv_load_policy:3,playsinline:1,cc_load_policy:0,
                             modestbranding:1,start:\(start),origin:'https://purrch.app'},
-                events:{onReady:function(e){e.target.mute();e.target.playVideo();post('ready')},
+                events:{onReady:function(e){e.target.mute();e.target.playVideo()},
+                        onStateChange:function(e){if(e.data===1||e.data===2||e.data===0)reveal()},
                         onError:function(e){post('error:'+e.data)}}});
             }
+            // "Ready" only once real frames are on screen; until then the caller keeps showing the
+            // thumbnail instead of YouTube's black loading screen.
+            var revealed=false;
+            function reveal(){if(revealed)return;revealed=true;setTimeout(function(){post('ready')},250)}
             window.purrchSync=function(t,play,seek){
               if(!player||!player.getPlayerState)return;
               var s=player.getPlayerState();
