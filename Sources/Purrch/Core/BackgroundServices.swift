@@ -7,6 +7,7 @@ enum Services {
         ClipboardService.shared.start()
         NowPlayingService.shared.start()
         BrowserMediaService.shared.start()
+        EmbeddedPlayerHost.shared.startPrewarming()
         DownloadsService.shared.start()
         ScreenTimeService.shared.start()
         WeatherService.shared.start()

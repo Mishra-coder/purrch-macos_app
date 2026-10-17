@@ -51,7 +51,19 @@ final class NotchWindowController {
             .environmentObject(settings)
         let host = NSHostingView(rootView: root)
         host.sizingOptions = []
-        panel.contentView = host
+        // The embedded YouTube player waits here, invisible, while no view shows it: inside an on-screen
+        // window WebKit keeps it playing, so reopening the notch shows the video at once.
+        let parking = NSView(frame: NSRect(origin: .zero, size: Self.panelSize))
+        parking.wantsLayer = true
+        parking.alphaValue = 0
+        let content = NSView(frame: NSRect(origin: .zero, size: Self.panelSize))
+        for view in [parking, host] {
+            view.frame = content.bounds
+            view.autoresizingMask = [.width, .height]
+            content.addSubview(view)
+        }
+        panel.contentView = content
+        EmbeddedPlayerHost.shared.parkingView = parking
 
         layout()
         panel.orderFrontRegardless()

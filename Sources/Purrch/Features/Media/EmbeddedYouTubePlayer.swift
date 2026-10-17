@@ -1,46 +1,197 @@
 import SwiftUI
 import WebKit
+import Combine
 
 /// Plays the same YouTube video as the browser tab, muted, inside the notch, and keeps it in step with
 /// the tab (position and play / pause). This gives smooth, full-frame-rate video; sound stays in the
-/// browser. Calls `onFailure` when the video can't be embedded (the owner disabled it, or the player
-/// never loads), so the caller can fall back to mirroring frames.
+/// browser. The player itself lives in `EmbeddedPlayerHost` and outlives this view, so reopening the
+/// notch shows the video at once instead of loading YouTube again.
 struct EmbeddedYouTubePlayer: NSViewRepresentable {
     let videoID: String
-    let isPlaying: Bool
-    /// Live streams have no stable position to sync to; only play / pause is mirrored.
-    let isLive: Bool
-    let onReady: () -> Void
-    let onFailure: () -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(onReady: onReady, onFailure: onFailure) }
+    func makeNSView(context: Context) -> NSView {
+        let container = PassthroughView()
+        let host = EmbeddedPlayerHost.shared
+        host.prepare(videoID: videoID)
+        host.attach(to: container)
+        return container
+    }
 
-    func makeNSView(context: Context) -> WKWebView {
+    func updateNSView(_ container: NSView, context: Context) {
+        let host = EmbeddedPlayerHost.shared
+        if host.videoID != videoID {
+            host.prepare(videoID: videoID)
+            host.attach(to: container)
+        }
+    }
+
+    static func dismantleNSView(_ container: NSView, coordinator: ()) {
+        EmbeddedPlayerHost.shared.detach(from: container)
+    }
+
+    /// Draws only. Clicks go to the SwiftUI controls on top.
+    final class PassthroughView: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    }
+}
+
+/// The one embedded YouTube player. It loads ahead of time when a browser video is playing in video mode,
+/// keeps playing (muted) for a while after the notch closes, and moves into whichever view shows it next.
+@MainActor
+final class EmbeddedPlayerHost: NSObject, ObservableObject, WKScriptMessageHandler {
+    static let shared = EmbeddedPlayerHost()
+
+    /// The loaded video has frames on screen.
+    @Published private(set) var readyVideoID: String?
+    /// The video can't be embedded (the owner disabled it, or the player never loaded).
+    @Published private(set) var failedVideoID: String?
+
+    private(set) var videoID: String?
+    private var webView: PassthroughWebView?
+    private weak var container: NSView?
+    /// Invisible view in the always-on-screen notch window that holds the player while nothing shows it.
+    weak var parkingView: NSView?
+    private var detachedAt: Date? = Date()
+    private var timer: Timer?
+    private var loadDeadline: Date?
+    private var lastSeek = Date.distantPast
+    private var prewarm: AnyCancellable?
+
+    /// After this long out of sight the hidden player pauses instead of following the tab.
+    private static let keepWarm: TimeInterval = 60
+    /// Size used while parked, so YouTube still picks a sharp quality.
+    private static let hiddenSize = NSRect(x: 0, y: 0, width: 1280, height: 720)
+
+    /// Load the playing browser video in advance, so the first open is instant too.
+    func startPrewarming() {
+        prewarm = BrowserMediaService.shared.$videos
+            .receive(on: RunLoop.main)
+            .sink { [weak self] videos in
+                MainActor.assumeIsolated {
+                    guard let self, Self.wantsVideo,
+                          let video = videos.first(where: { $0.isPlaying && $0.controllable }),
+                          let id = video.videoID, id != self.videoID else { return }
+                    self.prepare(videoID: id, start: video.current)
+                }
+            }
+    }
+
+    private static var wantsVideo: Bool {
+        UserDefaults.standard.string(forKey: "nowPlaying.mode") == MediaViewMode.video.rawValue
+            || AppSettings.shared.videoPeekOnHover
+    }
+
+    func prepare(videoID: String, start: Double? = nil) {
+        guard videoID != self.videoID else { return }
+        self.videoID = videoID
+        if container == nil { detachedAt = Date() }
+        readyVideoID = nil
+        failedVideoID = nil
+        loadDeadline = Date().addingTimeInterval(15)
+        lastSeek = .distantPast
+        let at = start ?? BrowserMediaService.shared.videos.first { $0.videoID == videoID }?.current ?? 0
+        let view = webView ?? makeWebView()
+        view.loadHTMLString(Self.page(videoID: videoID, start: max(0, Int(at))), baseURL: URL(string: "https://purrch.app"))
+        startTimer()
+    }
+
+    func attach(to container: NSView) {
+        guard let view = webView else { return }
+        self.container = container
+        detachedAt = nil
+        view.removeFromSuperview()
+        view.frame = container.bounds
+        view.autoresizingMask = [.width, .height]
+        container.addSubview(view)
+        startTimer()
+        // Let the frame stream report a fresh position first, then catch up straight away.
+        lastSeek = .distantPast
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.sync() }
+    }
+
+    func detach(from container: NSView) {
+        // A newer view may already have taken the player (e.g. while switching into theater).
+        guard self.container === container, let view = webView else { return }
+        self.container = nil
+        detachedAt = Date()
+        park(view)
+    }
+
+    /// Off-window web views are treated as hidden and stop playing, so keep it in the notch window.
+    private func park(_ view: NSView) {
+        view.removeFromSuperview()
+        view.autoresizingMask = []
+        view.frame = Self.hiddenSize
+        parkingView?.addSubview(view)
+    }
+
+    private func makeWebView() -> PassthroughWebView {
         let config = WKWebViewConfiguration()
         config.mediaTypesRequiringUserActionForPlayback = []
-        config.userContentController.add(context.coordinator, name: "purrch")
-        let view = PassthroughWebView(frame: .zero, configuration: config)
+        config.userContentController.add(self, name: "purrch")
+        let view = PassthroughWebView(frame: Self.hiddenSize, configuration: config)
         view.setValue(false, forKey: "drawsBackground")
-        context.coordinator.webView = view
-        context.coordinator.load(videoID: videoID, start: BrowserMediaService.shared.estimatedTime(isPlaying: isPlaying))
-        context.coordinator.startSync(isPlaying: isPlaying, isLive: isLive)
+        webView = view
+        park(view)
         return view
     }
 
-    func updateNSView(_ view: WKWebView, context: Context) {
-        let c = context.coordinator
-        c.onReady = onReady
-        c.onFailure = onFailure
-        if c.videoID != videoID {
-            c.load(videoID: videoID, start: BrowserMediaService.shared.estimatedTime(isPlaying: isPlaying))
+    private func startTimer() {
+        guard timer == nil else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.sync() }
         }
-        c.isPlaying = isPlaying
-        c.isLive = isLive
     }
 
-    static func dismantleNSView(_ view: WKWebView, coordinator: Coordinator) {
-        coordinator.stop()
-        view.configuration.userContentController.removeScriptMessageHandler(forName: "purrch")
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    /// Nudge the embedded player toward the tab: same play state, and close to the same position.
+    /// Small drift is closed by playing slightly faster or slower; only a large gap seeks, and rarely,
+    /// because every seek re-buffers and would show up as a stutter.
+    private func sync() {
+        guard let videoID, failedVideoID != videoID else { return }
+        if readyVideoID != videoID {
+            if let deadline = loadDeadline, Date() > deadline { fail() }
+            // YouTube sometimes drops the autoplay request and sits unstarted; ask again.
+            webView?.evaluateJavaScript("window.purrchKick && purrchKick()")
+            return
+        }
+        let service = BrowserMediaService.shared
+        let video = service.videos.first { $0.videoID == videoID }
+        let shown = container != nil
+        if let detachedAt, Date().timeIntervalSince(detachedAt) > Self.keepWarm {
+            // Out of sight for a while: pause and rest until a view shows it again.
+            webView?.evaluateJavaScript("window.purrchSync && purrchSync(0, false, false, true)")
+            stopTimer()
+            return
+        }
+        let playing = video?.isPlaying ?? false
+        // Positions are only fresh while a view streams this video; hidden, follow play / pause only.
+        let isLive = (video?.duration ?? 0) == 0 || !shown
+        let target = service.estimatedTime(isPlaying: playing)
+        let canSeek = Date().timeIntervalSince(lastSeek) > 8
+        webView?.evaluateJavaScript("window.purrchSync && purrchSync(\(target), \(playing), \(canSeek), \(isLive))") { [weak self] result, _ in
+            if (result as? String) == "seek" { self?.lastSeek = Date() }
+        }
+    }
+
+    private func fail() {
+        guard let videoID, failedVideoID != videoID else { return }
+        failedVideoID = videoID
+    }
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let body = message.body as? String else { return }
+        if body.hasPrefix("ready:") {
+            let id = String(body.dropFirst(6))
+            if id == videoID { readyVideoID = id }
+        } else if body.hasPrefix("error") {
+            // 2, 5, 100, 101, 150, 153: bad id, HTML5 error, removed, embedding disabled, config error.
+            fail()
+        }
     }
 
     /// Draws only. Clicks go to the SwiftUI controls on top.
@@ -53,113 +204,51 @@ struct EmbeddedYouTubePlayer: NSViewRepresentable {
         }
     }
 
-    @MainActor
-    final class Coordinator: NSObject, WKScriptMessageHandler {
-        var onReady: () -> Void
-        var onFailure: () -> Void
-        weak var webView: WKWebView?
-        var videoID = ""
-        var isPlaying = true
-        var isLive = false
-        private var timer: Timer?
-        private var ready = false
-        private var failed = false
-        private var loadDeadline: Date?
-        private var lastSeek = Date.distantPast
-
-        init(onReady: @escaping () -> Void, onFailure: @escaping () -> Void) {
-            self.onReady = onReady
-            self.onFailure = onFailure
+    private static func page(videoID: String, start: Int) -> String {
+        """
+        <!doctype html><html><head><meta name="viewport" content="width=device-width">
+        <style>html,body{margin:0;height:100%;background:#000;overflow:hidden}
+        /* The player is taller than the view: YouTube's title bar and end-screen strip land in the
+           letterbox above and below the picture, which is cropped away. */
+        #p,iframe{position:fixed;left:0;top:-70px;width:100%;height:calc(100% + 140px);border:0;pointer-events:none}</style>
+        </head><body><div id="p"></div>
+        <script>
+        function post(m){window.webkit.messageHandlers.purrch.postMessage(m)}
+        var player;
+        function onYouTubeIframeAPIReady(){
+          player=new YT.Player('p',{videoId:'\(videoID)',
+            playerVars:{autoplay:1,mute:1,controls:0,disablekb:1,fs:0,rel:0,iv_load_policy:3,playsinline:1,cc_load_policy:0,
+                        modestbranding:1,start:\(start),origin:'https://purrch.app'},
+            events:{onReady:function(e){e.target.mute();e.target.playVideo()},
+                    onStateChange:function(e){if(e.data===1||e.data===2||e.data===0)reveal()},
+                    onError:function(e){post('error:'+e.data)}}});
         }
-
-        func load(videoID: String, start: Double) {
-            self.videoID = videoID
-            ready = false
-            failed = false
-            loadDeadline = Date().addingTimeInterval(8)
-            webView?.loadHTMLString(Self.page(videoID: videoID, start: max(0, Int(start))),
-                                    baseURL: URL(string: "https://purrch.app"))
-        }
-
-        func startSync(isPlaying: Bool, isLive: Bool) {
-            self.isPlaying = isPlaying
-            self.isLive = isLive
-            timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.sync() }
-            }
-        }
-
-        func stop() {
-            timer?.invalidate()
-            timer = nil
-        }
-
-        /// Nudge the embedded player toward the tab: same play state, and the same position within ~1.2 s.
-        private func sync() {
-            guard !failed else { return }
-            if !ready {
-                if let deadline = loadDeadline, Date() > deadline { fail() }
-                return
-            }
-            let service = BrowserMediaService.shared
-            let target = service.estimatedTime(isPlaying: isPlaying)
-            let canSeek = !isLive && Date().timeIntervalSince(lastSeek) > 3
-            if canSeek { lastSeek = Date() }
-            webView?.evaluateJavaScript("window.purrchSync && purrchSync(\(target), \(isPlaying), \(canSeek))")
-        }
-
-        private func fail() {
-            guard !failed else { return }
-            failed = true
-            stop()
-            onFailure()
-        }
-
-        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard let body = message.body as? String else { return }
-            if body == "ready" {
-                ready = true
-                onReady()
-            } else if body.hasPrefix("error") {
-                // 2, 5, 100, 101, 150, 153: bad id, HTML5 error, removed, embedding disabled, config error.
-                fail()
-            }
-        }
-
-        private static func page(videoID: String, start: Int) -> String {
-            """
-            <!doctype html><html><head><meta name="viewport" content="width=device-width">
-            <style>html,body{margin:0;height:100%;background:#000;overflow:hidden}
-            /* The player is taller than the view: YouTube's title bar and end-screen strip land in the
-               letterbox above and below the picture, which is cropped away. */
-            #p,iframe{position:fixed;left:0;top:-70px;width:100%;height:calc(100% + 140px);border:0;pointer-events:none}</style>
-            </head><body><div id="p"></div>
-            <script>
-            function post(m){window.webkit.messageHandlers.purrch.postMessage(m)}
-            var player;
-            function onYouTubeIframeAPIReady(){
-              player=new YT.Player('p',{videoId:'\(videoID)',
-                playerVars:{autoplay:1,mute:1,controls:0,disablekb:1,fs:0,rel:0,iv_load_policy:3,playsinline:1,cc_load_policy:0,
-                            modestbranding:1,start:\(start),origin:'https://purrch.app'},
-                events:{onReady:function(e){e.target.mute();e.target.playVideo()},
-                        onStateChange:function(e){if(e.data===1||e.data===2||e.data===0)reveal()},
-                        onError:function(e){post('error:'+e.data)}}});
-            }
-            // "Ready" only once real frames are on screen; until then the caller keeps showing the
-            // thumbnail instead of YouTube's black loading screen.
-            var revealed=false;
-            function reveal(){if(revealed)return;revealed=true;setTimeout(function(){post('ready')},250)}
-            window.purrchSync=function(t,play,seek){
-              if(!player||!player.getPlayerState)return;
-              var s=player.getPlayerState();
-              var d=Math.abs(player.getCurrentTime()-t);if(seek&&d>1.2&&d<600)player.seekTo(t,true);
-              if(play&&s!==1&&s!==3)player.playVideo();
-              if(!play&&s===1)player.pauseVideo();
-            };
-            </script>
-            <script src="https://www.youtube.com/iframe_api"></script>
-            </body></html>
-            """
-        }
+        // "Ready" only once real frames are on screen; until then the caller keeps showing the
+        // thumbnail instead of YouTube's black loading screen.
+        var revealed=false;
+        function reveal(){if(revealed)return;revealed=true;setTimeout(function(){post('ready:\(videoID)')},250)}
+        function rate(r){var a=player.getAvailablePlaybackRates?player.getAvailablePlaybackRates():[1];
+          if(a.indexOf(r)<0)r=1;if(player.getPlaybackRate()!==r)player.setPlaybackRate(r)}
+        window.purrchKick=function(){
+          if(!player||!player.getPlayerState)return;
+          var s=player.getPlayerState();if(s===-1||s===5){player.mute();player.playVideo()}
+        };
+        window.purrchSync=function(t,play,seek,live){
+          if(!player||!player.getPlayerState)return '';
+          var s=player.getPlayerState();
+          if(!play){rate(1);if(s===1)player.pauseVideo();return ''}
+          if(s===3)return '';
+          if(s!==1){player.playVideo();return ''}
+          if(live){rate(1);return ''}
+          var d=t-player.getCurrentTime(),a=Math.abs(d);
+          // Seek a little ahead: the browser keeps playing while this player buffers.
+          if(a>2.5&&a<600&&seek){rate(1);player.seekTo(t+0.6,true);return 'seek'}
+          rate(a<0.3?1:(d>0?1.25:0.75));return '';
+        };
+        </script>
+        <script src="https://www.youtube.com/iframe_api"></script>
+        </body></html>
+        """
     }
 }
+

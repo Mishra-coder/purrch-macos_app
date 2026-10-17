@@ -310,23 +310,19 @@ struct LiveVideoPlayer: View {
     /// Grow to / shrink from theater mode. When set, clicking the picture expands instead of pausing.
     var onToggleSize: (() -> Void)? = nil
     var isTheater = false
-    @State private var embedReady = false
-    @State private var embedFailed = false
+    @ObservedObject private var embed = EmbeddedPlayerHost.shared
 
     /// Smooth path: YouTube's own player, muted and synced. Falls back to mirrored frames.
-    private var usesEmbed: Bool { !embedFailed && video.videoID != nil }
+    private var usesEmbed: Bool { video.videoID != nil && embed.failedVideoID != video.videoID }
+    private var embedReady: Bool { video.videoID != nil && embed.readyVideoID == video.videoID }
 
     var body: some View {
         ZStack {
             Color.black
             if usesEmbed, let id = video.videoID {
-                EmbeddedYouTubePlayer(videoID: id, isPlaying: video.isPlaying, isLive: video.duration == 0,
-                                      onReady: { withAnimation(.easeOut(duration: 0.3)) { embedReady = true } },
-                                      onFailure: {
-                                          embedFailed = true
-                                          browser.setStreamImages(true)
-                                      })
+                EmbeddedYouTubePlayer(videoID: id)
                     .opacity(embedReady ? 1 : 0)
+                    .animation(.easeOut(duration: 0.3), value: embedReady)
                     .allowsHitTesting(false)
             } else {
                 // Frames land on this layer directly; SwiftUI never redraws for them.
@@ -375,9 +371,10 @@ struct LiveVideoPlayer: View {
             browser.setStreamImages(!usesEmbed)
             browser.startFrames(for: video)
         }
+        .onChange(of: usesEmbed) { _, embedded in
+            if !embedded { browser.setStreamImages(true) }
+        }
         .onChange(of: video.id) { _, _ in
-            embedReady = false
-            embedFailed = false
             browser.setStreamImages(!usesEmbed)
             browser.switchFrames(to: video)
         }
