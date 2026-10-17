@@ -25,7 +25,7 @@ final class NotchWindowController {
 
     /// Room around the visible shape for its shadow.
     private static let panelSize = CGSize(width: NotchState.expandedSize.width + 60,
-                                          height: NotchState.expandedSize.height + 40)
+                                          height: max(NotchState.expandedSize.height, NotchState.maxTheaterHeight) + 40)
 
     init() {
         panel = NotchPanel(

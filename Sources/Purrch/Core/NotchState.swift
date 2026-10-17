@@ -44,12 +44,25 @@ final class NotchState: ObservableObject {
 
     static let expandedSize = CGSize(width: 780, height: 420)
     static let videoPeekSize = CGSize(width: 540, height: 352)
+    /// Tallest the theater panel gets; the window is sized to fit it.
+    static let maxTheaterHeight: CGFloat = 500
+
+    /// Full notch: tall enough that a 16:9 video fills the whole width under the header.
+    var theaterSize: CGSize {
+        let width = Self.expandedSize.width
+        let header = max(notchSize.height, 28) + 6
+        let video = (width - 24) * 9 / 16
+        return CGSize(width: width, height: min(Self.maxTheaterHeight, (header + video + 12).rounded()))
+    }
 
     /// Extra width on each side of the notch used by the collapsed live activity.
     @Published var liveActivityWing: CGFloat = 0
 
     var currentSize: CGSize {
-        if isExpanded { return isVideoPeek ? Self.videoPeekSize : Self.expandedSize }
+        if isExpanded {
+            if isVideoPeek { return Self.videoPeekSize }
+            return theaterVideoID != nil ? theaterSize : Self.expandedSize
+        }
         let peek: CGFloat = isPeeking ? 1 : 0
         return CGSize(width: notchSize.width + liveActivityWing * 2 + peek * 18,
                       height: notchSize.height + peek * 5)
