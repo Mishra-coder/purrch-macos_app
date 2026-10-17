@@ -19,8 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated {
                 let state = NotchState.shared
                 if (note.object as? String) == "close" {
-                    state.isPinned = false
-                    state.close()
+                    state.forceClose()
                     return
                 }
                 if (note.object as? String) == "theater" {

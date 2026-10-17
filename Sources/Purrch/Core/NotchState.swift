@@ -85,8 +85,11 @@ final class NotchState: ObservableObject {
         open(module)
     }
 
+    /// Pinned, or watching a video in theater: hover-out and outside clicks leave the panel open.
+    var staysOpen: Bool { isPinned || theaterVideoID != nil }
+
     func close() {
-        guard !isPinned else { return }
+        guard !staysOpen else { return }
         holdUntilHovered = false
         withAnimation(Motion.close) {
             isExpanded = false
@@ -94,6 +97,13 @@ final class NotchState: ObservableObject {
             showSettings = false
             theaterVideoID = nil
         }
+    }
+
+    /// Closes even when pinned or in theater, for explicit requests (close command, screenshot, full screen).
+    func forceClose() {
+        isPinned = false
+        theaterVideoID = nil
+        close()
     }
 
     func select(_ module: ModuleID) {

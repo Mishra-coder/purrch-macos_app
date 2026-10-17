@@ -191,7 +191,7 @@ final class NotchWindowController {
         } else {
             hoverStart = nil
             if shapeRect(padding: 18).contains(mouse) { state.holdUntilHovered = false }
-            if state.isPinned || state.holdUntilHovered || buttonsDown || shapeRect(padding: 18).contains(mouse) {
+            if state.staysOpen || state.holdUntilHovered || buttonsDown || shapeRect(padding: 18).contains(mouse) {
                 leaveStart = nil
                 return
             }
@@ -229,7 +229,7 @@ final class NotchWindowController {
 
     private func setHidden(_ hidden: Bool) {
         state.isHidden = hidden
-        if hidden { state.isPinned = false; state.close() }
+        if hidden { state.forceClose() }
         panel.alphaValue = hidden ? 0 : 1
     }
 }

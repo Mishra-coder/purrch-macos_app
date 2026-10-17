@@ -77,8 +77,7 @@ final class CapturesModel: ObservableObject {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
         let target = Self.folder.appendingPathComponent("Screenshot \(formatter.string(from: Date())).png")
-        NotchState.shared.isPinned = false
-        NotchState.shared.close()
+        NotchState.shared.forceClose()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
