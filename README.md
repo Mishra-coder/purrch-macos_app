@@ -146,12 +146,12 @@ Hover is detected by polling `NSEvent.mouseLocation` at 30 Hz against the shape'
 
 ```
 collapsed  ── pointer rests 160 ms ─────────────────────────►  expanded (or video preview)
-expanded   ── pointer outside 350 ms, not pinned or theater ─►  collapsed
+expanded   ── pointer outside 350 ms, not pinned, no button ─►  collapsed
 collapsed  ── file drag enters the notch ───────────────────►  expanded on Shelf
-any        ── Esc, or click in another app (not theater) ───►  collapsed
+any        ── Esc, or click in another app ─────────────────►  collapsed
 ```
 
-`NotchState` holds this state, the selected module and the tab-switch direction. Every transition goes through the curves in `Motion` (`open`, `close`, `pop`, `expoOut`), so the panel, tabs and content move with one consistent feel.
+`NotchState` holds this state, the selected module and the tab-switch direction. A video in Full notch (theater) is remembered when the panel closes, so hovering again returns to it; Exit or Esc leaves theater. Every transition goes through the curves in `Motion` (`open`, `close`, `pop`, `expoOut`), so the panel, tabs and content move with one consistent feel.
 
 ### Modules
 
@@ -245,7 +245,7 @@ The app listens for the distributed notification `com.mishracoder.purrch.open`. 
 
 **macOS asks for permissions again after every build.** Ad-hoc signatures change with each build, so privacy grants do not carry over. Sign with a stable identity (`SIGN_IDENTITY`) to keep them.
 
-**The panel does not close when the pointer leaves.** It is pinned. The pin control in the header shows "Pinned" while active; click it to release. A video in Full notch (theater) also stays open until you click **Exit** or press Esc.
+**The panel does not close when the pointer leaves.** It is pinned. The pin control in the header shows "Pinned" while active; click it to release.
 
 **Browser videos are listed but cannot be controlled.** Enable "Allow JavaScript from Apple Events" in the browser (Chrome: View, Developer; Safari: Develop), or use the Enable button in the notch, which does it once Accessibility is granted.
 

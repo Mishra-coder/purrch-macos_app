@@ -191,7 +191,7 @@ final class NotchWindowController {
         } else {
             hoverStart = nil
             if shapeRect(padding: 18).contains(mouse) { state.holdUntilHovered = false }
-            if state.staysOpen || state.holdUntilHovered || buttonsDown || shapeRect(padding: 18).contains(mouse) {
+            if state.isPinned || state.holdUntilHovered || buttonsDown || shapeRect(padding: 18).contains(mouse) {
                 leaveStart = nil
                 return
             }
