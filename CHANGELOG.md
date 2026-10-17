@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- The video title and controls fade out after a few seconds of playback and come back when the pointer moves over the video, like YouTube. A thin red progress line stays along the bottom while they are hidden.
+- Full notch grows a little taller so a 16:9 video fills its whole width, with no black bars at the sides.
+- Captures shows all your screenshots and screen recordings (up to the newest 500) as small tiles, newest first. It no longer stops at 24 hours, and other images on the Desktop are left out.
+- No jump or stutter when the notch opens: the hidden player keeps up with the browser's position while the notch is closed, for up to 5 minutes.
+
 ## 1.0.2 — 2026-10-17
 
 **Download:** [Purrch-1.0.2.dmg](https://github.com/Mishra-coder/purrch-macos_app/releases/download/v1.0.2/Purrch-1.0.2.dmg)
