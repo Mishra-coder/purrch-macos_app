@@ -21,8 +21,25 @@ Purrch is a native macOS menu-bar-less app that lives in the notch. Hover over t
 
 The project is plain Swift and SwiftUI with AppKit where SwiftUI falls short. There are no third-party packages, no account, and no telemetry. Data stays on the machine; secrets go to the keychain.
 
+## Download
+
+**[Download Purrch for Mac (.dmg)](https://github.com/Mishra-coder/purrch-macos_app/releases/latest/download/Purrch-1.0.0.dmg)** · Apple Silicon (M1 or later), macOS 14 or later
+
+1. Open the downloaded `Purrch-1.0.0.dmg`.
+2. Drag **Purrch** onto the **Applications** folder.
+3. Open Purrch from Applications. macOS will say it cannot verify the developer; click **Done**.
+4. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to Purrch, then confirm.
+
+You only need step 4 once. Then hover over the notch to open the panel.
+
+> Purrch is not notarised by Apple yet, which is why step 4 is needed. If you prefer the Terminal, this does the same thing:
+> ```sh
+> xattr -dr com.apple.quarantine /Applications/Purrch.app
+> ```
+
 ## Table of contents
 
+- [Download](#download)
 - [Highlights](#highlights)
 - [Quick start](#quick-start)
 - [Requirements](#requirements)
@@ -60,7 +77,7 @@ The project is plain Swift and SwiftUI with AppKit where SwiftUI falls short. Th
 ## Quick start
 
 ```sh
-git clone <repository-url> purrch && cd purrch
+git clone https://github.com/Mishra-coder/purrch-macos_app.git purrch && cd purrch
 make run
 ```
 
