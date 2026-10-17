@@ -23,14 +23,16 @@ The project is plain Swift and SwiftUI with AppKit where SwiftUI falls short. Th
 
 ## Download
 
-**[Download Purrch for Mac (.dmg)](https://github.com/Mishra-coder/purrch-macos_app/releases/latest/download/Purrch-1.0.1.dmg)** · Apple Silicon (M1 or later), macOS 14 or later
+**[Download Purrch for Mac (.dmg)](https://github.com/Mishra-coder/purrch-macos_app/releases/latest/download/Purrch-1.0.2.dmg)** · Apple Silicon (M1 or later), macOS 14 or later
 
-1. Open the downloaded `Purrch-1.0.1.dmg`.
+1. Open the downloaded `Purrch-1.0.2.dmg`.
 2. Drag **Purrch** onto the **Applications** folder.
 3. Open Purrch from Applications. macOS will say it cannot verify the developer; click **Done**.
 4. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to Purrch, then confirm.
 
 You only need step 4 once. Then hover over the notch to open the panel.
+
+What changed in each version: [CHANGELOG.md](CHANGELOG.md).
 
 > Purrch is not notarised by Apple yet, which is why step 4 is needed. If you prefer the Terminal, this does the same thing:
 > ```sh
@@ -40,6 +42,7 @@ You only need step 4 once. Then hover over the notch to open the panel.
 ## Table of contents
 
 - [Download](#download)
+- [Changelog](CHANGELOG.md)
 - [Highlights](#highlights)
 - [Quick start](#quick-start)
 - [Requirements](#requirements)
@@ -163,6 +166,8 @@ Work that must continue while the panel is closed lives in `@MainActor` services
 
 `BrowserMediaService` enumerates YouTube tabs in Chromium-family browsers and Safari over Apple Events and controls each tab's `<video>` with short JavaScript snippets. The hover preview draws the video into an offscreen canvas in the page and returns JPEG frames. Decoding happens off the main thread; frames are assigned directly to a `CALayer` through `FrameSink`, so SwiftUI is not involved per frame. Playback state is folded back into the published model at 2 Hz, and the periodic tab scan pauses while a preview is streaming.
 
+When the video can be embedded, the picture comes from a muted YouTube embed instead, which plays at full frame rate. `EmbeddedPlayerHost` owns that one web view. It starts loading as soon as a browser video plays in Video mode and stays parked, invisible, in the notch window between opens, so the video shows as soon as the panel opens. It follows the tab by adjusting the playback rate for small drift and seeks only for large gaps. If the embed fails, the player falls back to mirrored frames.
+
 ### State and storage
 
 | Kind | Mechanism | Location |
@@ -216,8 +221,8 @@ All settings live in the panel (gear icon). Integrations need keys:
 
 ```sh
 SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" make dmg
-xcrun notarytool submit build/Purrch-1.0.1.dmg --keychain-profile <profile> --wait
-xcrun stapler staple build/Purrch-1.0.1.dmg
+xcrun notarytool submit build/Purrch-1.0.2.dmg --keychain-profile <profile> --wait
+xcrun stapler staple build/Purrch-1.0.2.dmg
 ```
 
 With a Developer ID identity the build enables the hardened runtime and a secure timestamp. Bump `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` before packaging; the DMG name is taken from the former.
