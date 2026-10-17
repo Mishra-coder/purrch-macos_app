@@ -75,7 +75,7 @@ enum ModuleID: String, CaseIterable, Identifiable, Codable {
         case .units: "Instant conversions"
         case .links: "Web search and saved sites"
         case .shelf: "Park files in the notch, drag them out later"
-        case .captures: "Screenshots and recordings from the last 24h"
+        case .captures: "Your screenshots and recordings, newest first"
         case .converter: "Convert and shrink images locally"
         case .downloads: "Live download progress"
         case .macmate: "Ask anything about your Mac"

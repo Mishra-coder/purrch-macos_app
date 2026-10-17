@@ -58,19 +58,30 @@ final class CapturesModel: ObservableObject {
         }
     }
 
+    /// Newest captures kept in the grid; older ones stay in the folder.
+    nonisolated private static let limit = 500
+
     nonisolated private static func scan(_ folder: URL) -> [CaptureFile] {
-        let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey, .isRegularFileKey]
+        let keys: [URLResourceKey] = [.creationDateKey, .contentModificationDateKey, .fileSizeKey, .isRegularFileKey]
         guard let urls = try? FileManager.default.contentsOfDirectory(
             at: folder, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]) else { return [] }
-        let cutoff = Date().addingTimeInterval(-24 * 3600)
-        return urls.compactMap { url -> CaptureFile? in
-            guard extensions.contains(url.pathExtension.lowercased()),
+        let found = urls.compactMap { url -> CaptureFile? in
+            guard extensions.contains(url.pathExtension.lowercased()), isScreenCapture(url),
                   let values = try? url.resourceValues(forKeys: Set(keys)),
                   values.isRegularFile == true,
-                  let date = values.contentModificationDate, date > cutoff else { return nil }
+                  let date = values.creationDate ?? values.contentModificationDate else { return nil }
             return CaptureFile(url: url, date: date, size: Int64(values.fileSize ?? 0))
         }
         .sorted { $0.date > $1.date }
+        return Array(found.prefix(limit))
+    }
+
+    /// Screenshots and screen recordings only, not every image on the Desktop. macOS tags its captures;
+    /// the file name covers captures copied from elsewhere, which lose the tag.
+    nonisolated private static func isScreenCapture(_ url: URL) -> Bool {
+        if getxattr(url.path, "com.apple.metadata:kMDItemIsScreenCapture", nil, 0, 0, 0) >= 0 { return true }
+        let name = url.lastPathComponent
+        return name.hasPrefix("Screenshot") || name.hasPrefix("Screen Recording") || name.hasPrefix("Screen Shot")
     }
 
     func takeScreenshot() {
@@ -205,7 +216,7 @@ struct CapturesModule: View {
             .padding(3)
             .background(Capsule().fill(theme.text.opacity(0.06)))
 
-            Text("Last 24 hours")
+            Text("Newest first")
                 .font(.system(size: 11))
                 .foregroundStyle(theme.secondaryText)
             Spacer()
@@ -228,7 +239,7 @@ struct CapturesModule: View {
 
     private var grid: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 160, maximum: 220), spacing: 12)], spacing: 12) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 104, maximum: 132), spacing: 8)], spacing: 10) {
                 ForEach(visible) { file in
                     CaptureTile(file: file,
                                 selecting: selecting,
@@ -255,7 +266,7 @@ struct CapturesModule: View {
                     .font(.system(size: 28, weight: .light))
                     .foregroundStyle(theme.accent)
             }
-            Text(model.loaded ? "Nothing captured today" : "Looking for captures…")
+            Text(model.loaded ? "No screenshots yet" : "Looking for captures…")
                 .font(.system(size: 14, weight: .semibold))
             Text("Press ⇧⌘4 or use the Screenshot button — new captures land here.")
                 .font(.system(size: 12))
@@ -354,42 +365,42 @@ private struct CaptureTile: View {
     @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             ZStack {
                 theme.text.opacity(0.06)
-                FileThumbnailView(url: file.url, size: CGSize(width: 440, height: 280), contentMode: .fill)
+                FileThumbnailView(url: file.url, size: CGSize(width: 264, height: 168), contentMode: .fill)
                 if file.isVideo {
                     Image(systemName: "play.fill")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.white)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 24, height: 24)
                         .background(Circle().fill(.black.opacity(0.55)))
                 }
                 // Dim + actions on hover.
                 LinearGradient(colors: [.black.opacity(hovering ? 0.55 : 0), .clear], startPoint: .top, endPoint: .center)
             }
             .aspectRatio(16 / 10, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .strokeBorder(selected ? theme.accent : (hovering ? theme.text.opacity(0.35) : theme.border.opacity(0.5)),
                                   lineWidth: selected ? 2.5 : 0.8)
             )
             .overlay(alignment: .topTrailing) {
                 if hovering && !selecting {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 3) {
                         tileButton("doc.on.doc", help: "Copy", action: onCopy)
                         tileButton("folder", help: "Show in Finder", action: onReveal)
                         tileButton("trash.fill", help: "Move to Trash", tint: .red, action: onTrash)
                     }
-                    .padding(7)
+                    .padding(4)
                     .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .topTrailing)))
                 }
             }
             .overlay(alignment: .topLeading) {
                 if selecting {
                     Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(selected ? theme.accent : .white)
                         .background(Circle().fill(.black.opacity(0.35)).padding(2))
                         .padding(7)
@@ -399,23 +410,18 @@ private struct CaptureTile: View {
             .overlay(alignment: .bottomTrailing) {
                 if file.isVideo {
                     Tag(text: file.url.pathExtension, color: .white)
-                        .padding(6)
+                        .padding(4)
                 }
             }
             .scaleEffect(selected ? 0.95 : (hovering ? 1.03 : 1))
             .shadow(color: .black.opacity(hovering ? 0.45 : 0.2), radius: hovering ? 10 : 4, y: hovering ? 6 : 2)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(file.name)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(theme.text)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text("\(Format.relative(file.date)) ago · \(Format.bytes(file.size))")
-                    .font(.system(size: 10))
-                    .foregroundStyle(theme.secondaryText)
-            }
-            .padding(.horizontal, 2)
+            // Small tiles: when it was taken says more than the long file name, which stays in the tooltip.
+            Text("\(Format.relative(file.date)) ago")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(theme.secondaryText)
+                .lineLimit(1)
+                .padding(.horizontal, 2)
         }
         .contentShape(Rectangle())
         .onHover { h in withAnimation(Motion.expoOut(0.25)) { hovering = h } }
@@ -427,9 +433,9 @@ private struct CaptureTile: View {
     private func tileButton(_ icon: String, help: String, tint: Color = .white, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(tint)
-                .frame(width: 26, height: 26)
+                .frame(width: 21, height: 21)
                 .background(Circle().fill(.ultraThinMaterial))
                 .background(Circle().fill(.black.opacity(0.35)))
         }
