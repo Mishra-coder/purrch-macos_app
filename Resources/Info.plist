@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Purrch</string>
+    <key>CFBundleDisplayName</key>
+    <string>Purrch</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.mishracoder.purrch</string>
+    <key>CFBundleExecutable</key>
+    <string>Purrch</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.productivity</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2026 Devendra Mishra. All rights reserved.</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Purrch shows your upcoming events in the notch.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Purrch shows your upcoming events in the notch.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>Purrch shows and checks off your reminders in the notch.</string>
+    <key>NSRemindersUsageDescription</key>
+    <string>Purrch shows and checks off your reminders in the notch.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Purrch uses your location to show local weather.</string>
+    <key>NSLocationUsageDescription</key>
+    <string>Purrch uses your location to show local weather.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Purrch reads and controls what Music, Spotify and YouTube in your browser are playing.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>Purrch lists your recent screenshots and recordings.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>Purrch shows download progress in the notch.</string>
+</dict>
+</plist>
