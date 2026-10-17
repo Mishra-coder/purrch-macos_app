@@ -23,9 +23,9 @@ The project is plain Swift and SwiftUI with AppKit where SwiftUI falls short. Th
 
 ## Download
 
-**[Download Purrch for Mac (.dmg)](https://github.com/Mishra-coder/purrch-macos_app/releases/latest/download/Purrch-1.0.2.dmg)** · Apple Silicon (M1 or later), macOS 14 or later
+**[Download Purrch for Mac (.dmg)](https://github.com/Mishra-coder/purrch-macos_app/releases/latest/download/Purrch-1.0.3.dmg)** · Apple Silicon (M1 or later), macOS 14 or later
 
-1. Open the downloaded `Purrch-1.0.2.dmg`.
+1. Open the downloaded `Purrch-1.0.3.dmg`.
 2. Drag **Purrch** onto the **Applications** folder.
 3. Open Purrch from Applications. macOS will say it cannot verify the developer; click **Done**.
 4. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to Purrch, then confirm.
@@ -221,8 +221,8 @@ All settings live in the panel (gear icon). Integrations need keys:
 
 ```sh
 SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" make dmg
-xcrun notarytool submit build/Purrch-1.0.2.dmg --keychain-profile <profile> --wait
-xcrun stapler staple build/Purrch-1.0.2.dmg
+xcrun notarytool submit build/Purrch-1.0.3.dmg --keychain-profile <profile> --wait
+xcrun stapler staple build/Purrch-1.0.3.dmg
 ```
 
 With a Developer ID identity the build enables the hardened runtime and a secure timestamp. Bump `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` before packaging; the DMG name is taken from the former.

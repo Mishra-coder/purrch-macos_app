@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.0.3 — 2026-10-18
+
+**Download:** [Purrch-1.0.3.dmg](https://github.com/Mishra-coder/purrch-macos_app/releases/download/v1.0.3/Purrch-1.0.3.dmg)
 
 - The video title and controls fade out after a few seconds of playback and come back when the pointer moves over the video, like YouTube. A thin red progress line stays along the bottom while they are hidden.
 - Full notch grows a little taller so a 16:9 video fills its whole width, with no black bars at the sides.
