@@ -336,10 +336,14 @@ struct LiveVideoPlayer: View {
             }
             if !(usesEmbed ? embedReady : browser.hasLiveFrame) {
                 // No picture from the browser yet (or the paused tab released it): show the video's thumbnail.
-                AsyncImage(url: video.largeThumbnailURL) { $0.resizable().aspectRatio(contentMode: .fill) } placeholder: {
-                    ProgressView().controlSize(.small)
-                }
-                .clipped()
+                // Overlaid on a clear view so the image's own size never stretches the player.
+                Color.clear
+                    .overlay {
+                        AsyncImage(url: video.largeThumbnailURL) { $0.resizable().aspectRatio(contentMode: .fill) } placeholder: {
+                            ProgressView().controlSize(.small)
+                        }
+                    }
+                    .clipped()
             }
             if !video.isPlaying {
                 Image(systemName: "play.fill")
