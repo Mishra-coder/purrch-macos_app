@@ -23,9 +23,9 @@ The project is plain Swift and SwiftUI with AppKit where SwiftUI falls short. Th
 
 ## Download
 
-**[Download Purrch for Mac (.dmg)](https://github.com/Mishra-coder/purrch-macos_app/releases/latest/download/Purrch-1.0.0.dmg)** · Apple Silicon (M1 or later), macOS 14 or later
+**[Download Purrch for Mac (.dmg)](https://github.com/Mishra-coder/purrch-macos_app/releases/latest/download/Purrch-1.0.1.dmg)** · Apple Silicon (M1 or later), macOS 14 or later
 
-1. Open the downloaded `Purrch-1.0.0.dmg`.
+1. Open the downloaded `Purrch-1.0.1.dmg`.
 2. Drag **Purrch** onto the **Applications** folder.
 3. Open Purrch from Applications. macOS will say it cannot verify the developer; click **Done**.
 4. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to Purrch, then confirm.
@@ -146,9 +146,9 @@ Hover is detected by polling `NSEvent.mouseLocation` at 30 Hz against the shape'
 
 ```
 collapsed  ── pointer rests 160 ms ─────────────────────────►  expanded (or video preview)
-expanded   ── pointer outside 350 ms, not pinned, no button ─►  collapsed
+expanded   ── pointer outside 350 ms, not pinned or theater ─►  collapsed
 collapsed  ── file drag enters the notch ───────────────────►  expanded on Shelf
-any        ── Esc, or click in another app ─────────────────►  collapsed
+any        ── Esc, or click in another app (not theater) ───►  collapsed
 ```
 
 `NotchState` holds this state, the selected module and the tab-switch direction. Every transition goes through the curves in `Motion` (`open`, `close`, `pop`, `expoOut`), so the panel, tabs and content move with one consistent feel.
@@ -216,8 +216,8 @@ All settings live in the panel (gear icon). Integrations need keys:
 
 ```sh
 SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" make dmg
-xcrun notarytool submit build/Purrch-1.0.0.dmg --keychain-profile <profile> --wait
-xcrun stapler staple build/Purrch-1.0.0.dmg
+xcrun notarytool submit build/Purrch-1.0.1.dmg --keychain-profile <profile> --wait
+xcrun stapler staple build/Purrch-1.0.1.dmg
 ```
 
 With a Developer ID identity the build enables the hardened runtime and a secure timestamp. Bump `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` before packaging; the DMG name is taken from the former.
@@ -245,7 +245,7 @@ The app listens for the distributed notification `com.mishracoder.purrch.open`. 
 
 **macOS asks for permissions again after every build.** Ad-hoc signatures change with each build, so privacy grants do not carry over. Sign with a stable identity (`SIGN_IDENTITY`) to keep them.
 
-**The panel does not close when the pointer leaves.** It is pinned. The pin control in the header shows "Pinned" while active; click it to release.
+**The panel does not close when the pointer leaves.** It is pinned. The pin control in the header shows "Pinned" while active; click it to release. A video in Full notch (theater) also stays open until you click **Exit** or press Esc.
 
 **Browser videos are listed but cannot be controlled.** Enable "Allow JavaScript from Apple Events" in the browser (Chrome: View, Developer; Safari: Develop), or use the Enable button in the notch, which does it once Accessibility is granted.
 
