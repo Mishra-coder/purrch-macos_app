@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Notchyff}",
+            "name": "Debug Purrch",
+            "target": "Purrch",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug Purrch"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Notchyff}",
+            "name": "Release Purrch",
+            "target": "Purrch",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release Purrch"
+        }
+    ]
+}
