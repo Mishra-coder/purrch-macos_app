@@ -292,6 +292,8 @@ struct TabBar: View {
     @State private var dragStartIndex = 0
     @State private var dragX: CGFloat = 0
     @State private var hovered: Int?
+    /// Pending hover-to-open; a short dwell so sweeping across the dock doesn't flick through modules.
+    @State private var hoverSelect: Task<Void, Never>?
 
     private let slot: CGFloat = 31
 
@@ -312,6 +314,13 @@ struct TabBar: View {
                 .onHover { inside in
                     withAnimation(Motion.peek) {
                         if inside { hovered = index } else if hovered == index { hovered = nil }
+                    }
+                    hoverSelect?.cancel()
+                    guard inside else { return }
+                    hoverSelect = Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(180))
+                        guard !Task.isCancelled, dragged == nil, hovered == index else { return }
+                        if state.selected != module || state.showSettings { state.select(module) }
                     }
                 }
                 // Drag wins once the pointer moves; a plain click falls through to the tap.
