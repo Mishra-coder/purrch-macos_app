@@ -311,6 +311,12 @@ struct LiveVideoPlayer: View {
     var onToggleSize: (() -> Void)? = nil
     var isTheater = false
     @ObservedObject private var embed = EmbeddedPlayerHost.shared
+    /// Title and controls fade out a few seconds after the pointer stops moving, like YouTube.
+    @State private var chromeVisible = true
+    @State private var hideChrome: Task<Void, Never>?
+
+    /// Paused, or the quality sheet is open: keep the controls up.
+    private var showsChrome: Bool { chromeVisible || !video.isPlaying || showQuality }
 
     /// Smooth path: YouTube's own player, muted and synced. Falls back to mirrored frames.
     private var usesEmbed: Bool { video.videoID != nil && embed.failedVideoID != video.videoID }
@@ -353,6 +359,18 @@ struct LiveVideoPlayer: View {
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
             }
             overlay
+                .opacity(showsChrome ? 1 : 0)
+                .allowsHitTesting(showsChrome)
+            if !showsChrome {
+                // With the controls hidden, a thin progress line stays along the bottom edge.
+                GeometryReader { geo in
+                    Rectangle().fill(Color.red)
+                        .frame(width: geo.size.width * video.progress, height: 3)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                }
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
             if showQuality {
                 qualityPanel
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
@@ -367,9 +385,16 @@ struct LiveVideoPlayer: View {
             if let onToggleSize, !isTheater { onToggleSize() } else { withAnimation(Motion.pop) { browser.toggle(video) } }
         }
         .help(onToggleSize != nil && !isTheater ? "Click to watch in the whole notch" : "")
+        .onContinuousHover { phase in
+            switch phase {
+            case .active: revealChrome()
+            case .ended: scheduleHideChrome(after: 0.8)
+            }
+        }
         .onAppear {
             browser.setStreamImages(!usesEmbed)
             browser.startFrames(for: video)
+            revealChrome()
         }
         .onChange(of: usesEmbed) { _, embedded in
             if !embedded { browser.setStreamImages(true) }
@@ -378,7 +403,25 @@ struct LiveVideoPlayer: View {
             browser.setStreamImages(!usesEmbed)
             browser.switchFrames(to: video)
         }
-        .onDisappear { browser.stopFrames() }
+        .onDisappear {
+            hideChrome?.cancel()
+            browser.stopFrames()
+        }
+    }
+
+    /// Show the title and controls, then hide them again once the pointer rests.
+    private func revealChrome() {
+        if !chromeVisible { withAnimation(.easeOut(duration: 0.2)) { chromeVisible = true } }
+        scheduleHideChrome(after: 2.5)
+    }
+
+    private func scheduleHideChrome(after delay: Double) {
+        hideChrome?.cancel()
+        hideChrome = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.4)) { chromeVisible = false }
+        }
     }
 
     private var overlay: some View {
