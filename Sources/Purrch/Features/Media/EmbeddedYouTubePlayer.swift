@@ -58,7 +58,7 @@ final class EmbeddedPlayerHost: NSObject, ObservableObject, WKScriptMessageHandl
     private var prewarm: AnyCancellable?
 
     /// After this long out of sight the hidden player pauses instead of following the tab.
-    private static let keepWarm: TimeInterval = 60
+    private static let keepWarm: TimeInterval = 300
     /// Size used while parked, so YouTube still picks a sharp quality.
     private static let hiddenSize = NSRect(x: 0, y: 0, width: 1280, height: 720)
 
@@ -68,12 +68,34 @@ final class EmbeddedPlayerHost: NSObject, ObservableObject, WKScriptMessageHandl
             .receive(on: RunLoop.main)
             .sink { [weak self] videos in
                 MainActor.assumeIsolated {
-                    guard let self, Self.wantsVideo,
+                    guard let self else { return }
+                    self.notePosition(in: videos)
+                    guard Self.wantsVideo,
                           let video = videos.first(where: { $0.isPlaying && $0.controllable }),
                           let id = video.videoID, id != self.videoID else { return }
                     self.prepare(videoID: id, start: video.current)
                 }
             }
+    }
+
+    /// Last position the browser reported for the loaded video, and when it arrived. The tab scan and
+    /// the frame stream both refresh the list, so this stays fresh even while the notch is closed.
+    private var reported: (time: Double, at: Date)?
+
+    private func notePosition(in videos: [BrowserVideo]) {
+        guard let videoID, let video = videos.first(where: { $0.videoID == videoID }) else { return }
+        if reported?.time != video.current { reported = (video.current, Date()) }
+    }
+
+    /// Where the tab's video is now. The frame stream is the most precise source while a view shows the
+    /// player; otherwise extrapolate from the last reported position.
+    private func browserTime(playing: Bool) -> Double? {
+        let service = BrowserMediaService.shared
+        if container != nil, Date().timeIntervalSince(service.streamTimeAt) < 1.5 {
+            return service.estimatedTime(isPlaying: playing)
+        }
+        guard let reported else { return nil }
+        return reported.time + (playing ? Date().timeIntervalSince(reported.at) : 0)
     }
 
     private static var wantsVideo: Bool {
@@ -84,6 +106,7 @@ final class EmbeddedPlayerHost: NSObject, ObservableObject, WKScriptMessageHandl
     func prepare(videoID: String, start: Double? = nil) {
         guard videoID != self.videoID else { return }
         self.videoID = videoID
+        reported = nil
         if container == nil { detachedAt = Date() }
         readyVideoID = nil
         failedVideoID = nil
@@ -161,7 +184,6 @@ final class EmbeddedPlayerHost: NSObject, ObservableObject, WKScriptMessageHandl
         }
         let service = BrowserMediaService.shared
         let video = service.videos.first { $0.videoID == videoID }
-        let shown = container != nil
         if let detachedAt, Date().timeIntervalSince(detachedAt) > Self.keepWarm {
             // Out of sight for a while: pause and rest until a view shows it again.
             webView?.evaluateJavaScript("window.purrchSync && purrchSync(0, false, false, true)")
@@ -169,11 +191,11 @@ final class EmbeddedPlayerHost: NSObject, ObservableObject, WKScriptMessageHandl
             return
         }
         let playing = video?.isPlaying ?? false
-        // Positions are only fresh while a view streams this video; hidden, follow play / pause only.
-        let isLive = (video?.duration ?? 0) == 0 || !shown
-        let target = service.estimatedTime(isPlaying: playing)
+        // Track the position while hidden too, so opening the notch never needs a visible seek.
+        let target = browserTime(playing: playing)
+        let isLive = (video?.duration ?? 0) == 0 || target == nil
         let canSeek = Date().timeIntervalSince(lastSeek) > 8
-        webView?.evaluateJavaScript("window.purrchSync && purrchSync(\(target), \(playing), \(canSeek), \(isLive))") { [weak self] result, _ in
+        webView?.evaluateJavaScript("window.purrchSync && purrchSync(\(target ?? 0), \(playing), \(canSeek), \(isLive))") { [weak self] result, _ in
             if (result as? String) == "seek" { self?.lastSeek = Date() }
         }
     }
