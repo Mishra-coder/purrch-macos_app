@@ -66,6 +66,17 @@ final class MacMateService: ObservableObject {
         }
     }
 
+    /// A single question with no chat history, for other modules such as Translate.
+    /// Web search stays off and the on-device model gets a fresh session.
+    func complete(provider: AIProvider, system: String, prompt: String) async throws -> String {
+        switch provider {
+        case .apple: try await askApple(system: system, prompt: prompt, keepContext: false)
+        case .claude: try await askClaude(system: system, history: [], prompt: prompt, webSearch: false)
+        case .openai: try await askOpenAI(system: system, history: [], prompt: prompt)
+        case .gemini: try await askGemini(system: system, history: [], prompt: prompt)
+        }
+    }
+
     // MARK: Context
 
     static func systemPrompt() async -> String {
@@ -92,7 +103,7 @@ final class MacMateService: ObservableObject {
 
     // MARK: Apple on-device
 
-    private func askApple(system: String, prompt: String) async throws -> String {
+    private func askApple(system: String, prompt: String, keepContext: Bool = true) async throws -> String {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, *) {
             switch SystemLanguageModel.default.availability {
@@ -109,11 +120,11 @@ final class MacMateService: ObservableObject {
                 throw HTTPJSON.Failure(message: "\(why) Pick Claude, OpenAI or Gemini in Settings to use a cloud model.")
             }
             let session: LanguageModelSession
-            if let existing = appleSession as? LanguageModelSession {
+            if keepContext, let existing = appleSession as? LanguageModelSession {
                 session = existing
             } else {
                 session = LanguageModelSession(instructions: system)
-                appleSession = session
+                if keepContext { appleSession = session }
             }
             let response = try await session.respond(to: prompt)
             return response.content
@@ -125,7 +136,8 @@ final class MacMateService: ObservableObject {
 
     // MARK: Claude
 
-    private func askClaude(system: String, history: [MacMateMessage], prompt: String) async throws -> String {
+    private func askClaude(system: String, history: [MacMateMessage], prompt: String,
+                           webSearch: Bool? = nil) async throws -> String {
         let key = settings.anthropicKey
         var messages: [[String: Any]] = Self.alternating(history, prompt).map {
             ["role": $0.role == .user ? "user" : "assistant", "content": $0.text]
@@ -137,7 +149,7 @@ final class MacMateService: ObservableObject {
             "output_config": ["effort": "low"],
             "fallbacks": "default",
         ]
-        if settings.macMateWebSearch {
+        if webSearch ?? settings.macMateWebSearch {
             body["tools"] = [["type": "web_search_20260209", "name": "web_search", "max_uses": 3]]
         }
         let headers = [
