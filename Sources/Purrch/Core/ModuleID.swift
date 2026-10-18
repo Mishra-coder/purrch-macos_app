@@ -4,7 +4,7 @@ import SwiftUI
 enum ModuleID: String, CaseIterable, Identifiable, Codable {
     case home, timers, clipboard, notes, scratchpad, emoji, units, links
     case shelf, captures, converter, downloads, macmate, message, ambience
-    case claude, calendar, weather, nowPlaying, system, screenTime, revenue, analytics
+    case claude, calendar, weather, nowPlaying, system, screenTime, revenue, analytics, translate
 
     var id: String { rawValue }
 
@@ -33,6 +33,7 @@ enum ModuleID: String, CaseIterable, Identifiable, Codable {
         case .screenTime: "Screen Time"
         case .revenue: "Revenue"
         case .analytics: "Analytics"
+        case .translate: "Translate"
         }
     }
 
@@ -61,6 +62,7 @@ enum ModuleID: String, CaseIterable, Identifiable, Codable {
         case .screenTime: "hourglass"
         case .revenue: "creditcard"
         case .analytics: "chart.line.uptrend.xyaxis"
+        case .translate: "character.bubble"
         }
     }
 
@@ -89,13 +91,14 @@ enum ModuleID: String, CaseIterable, Identifiable, Codable {
         case .screenTime: "App usage over seven days"
         case .revenue: "Today's sales from Stripe"
         case .analytics: "Live visitors from Plausible"
+        case .translate: "Translate, fix grammar, change tone"
         }
     }
 
     var playfulColor: Color {
         let palette: [Color] = [.blue, .orange, .pink, .yellow, .mint, .yellow, .teal, .cyan,
                                 .indigo, .purple, .green, .blue, .purple, .pink, .teal,
-                                .orange, .red, .cyan, .pink, .green, .indigo, .green, .blue]
+                                .orange, .red, .cyan, .pink, .green, .indigo, .green, .blue, .mint]
         return palette[(ModuleID.allCases.firstIndex(of: self) ?? 0) % palette.count]
     }
 
@@ -125,6 +128,7 @@ enum ModuleID: String, CaseIterable, Identifiable, Codable {
         case .screenTime: ScreenTimeModule()
         case .revenue: RevenueModule()
         case .analytics: AnalyticsModule()
+        case .translate: TranslateModule()
         }
     }
 }
