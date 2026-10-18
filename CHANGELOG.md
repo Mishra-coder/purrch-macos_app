@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.4 — 2026-10-18
+
+**Download:** [Purrch-1.0.4.dmg](https://github.com/Mishra-coder/purrch-macos_app/releases/download/v1.0.4/Purrch-1.0.4.dmg)
+
+- New Translate module. Type in any language, including Hinglish such as "kal milte hain yaar", and pick the language to translate into. The source language is detected automatically, or you can choose it and swap the two. It uses the same AI providers as MacMate (Apple on-device, Claude, OpenAI or Gemini), and you can pick a different one just for Translate. Translation runs live as you type and shows the detected language; your target language stays until you change it.
+- Grammarly-style writing help in the same module: **Fix grammar** corrects spelling, grammar and punctuation; **Improve** rewrites for clarity; **Tone** makes text formal, professional, friendly, confident or casual; **Shorten** makes it more concise. Changed words are highlighted, and **Accept** puts the result back in the editor. Word count, sentence count and reading time are shown below the text.
+
 ## 1.0.3 — 2026-10-18
 
 **Download:** [Purrch-1.0.3.dmg](https://github.com/Mishra-coder/purrch-macos_app/releases/download/v1.0.3/Purrch-1.0.3.dmg)
