@@ -256,7 +256,9 @@ struct TranslateModule: View {
             header
             if missingKey {
                 MissingSettingView(icon: "key", title: "\(provider.title) needs an API key",
-                                   subtitle: "Add your key in Settings, or switch to Apple (on-device).")
+                                   subtitle: provider == .gemini
+                                       ? "Get a free key at aistudio.google.com/apikey, then paste it in Settings → AI."
+                                       : "Add your key in Settings → AI, or switch to another provider.")
             } else {
                 HStack(spacing: 8) {
                     inputPane

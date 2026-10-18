@@ -207,7 +207,7 @@ final class MacMateService: ObservableObject {
         }
         // The key travels in a header rather than the URL so it never appears in error strings.
         let json = try await HTTPJSON.post(
-            URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent")!,
+            URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent")!,
             headers: ["x-goog-api-key": settings.geminiKey],
             body: ["systemInstruction": ["parts": [["text": system]]], "contents": contents])
         guard let candidates = (json as? [String: Any])?["candidates"] as? [[String: Any]],
