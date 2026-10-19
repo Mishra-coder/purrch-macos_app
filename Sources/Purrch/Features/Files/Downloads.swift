@@ -33,6 +33,9 @@ final class DownloadsService: ObservableObject {
     /// Finished during this session, newest first.
     @Published private(set) var completed: [DownloadItem] = []
     @Published private(set) var accessDenied = false
+    /// Files just moved to the Trash, with where they went, so "Undo" can put them back.
+    @Published private(set) var lastTrashed: [(original: URL, trashed: URL)] = []
+    private var undoTimer: Timer?
 
     let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads", isDirectory: true)
 
@@ -165,6 +168,43 @@ final class DownloadsService: ObservableObject {
         publishLiveActivity()
     }
 
+    // MARK: Trash
+
+    /// Moves files to the Trash (never deletes outright) and offers Undo for a few seconds.
+    func trash(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        withAnimation(Motion.pop) {
+            recent.removeAll { urls.contains($0.url) }
+            completed.removeAll { urls.contains($0.url) }
+        }
+        NSWorkspace.shared.recycle(urls) { moved, _ in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    let service = DownloadsService.shared
+                    withAnimation(Motion.expoOut(0.35)) {
+                        service.lastTrashed = moved.map { (original: $0.key, trashed: $0.value) }
+                    }
+                    service.undoTimer?.invalidate()
+                    service.undoTimer = Timer.scheduledTimer(withTimeInterval: 6, repeats: false) { _ in
+                        MainActor.assumeIsolated {
+                            withAnimation(Motion.expoOut(0.35)) { DownloadsService.shared.lastTrashed = [] }
+                        }
+                    }
+                    service.scan()
+                }
+            }
+        }
+    }
+
+    func undoTrash() {
+        for item in lastTrashed {
+            try? FileManager.default.moveItem(at: item.trashed, to: item.original)
+        }
+        undoTimer?.invalidate()
+        withAnimation(Motion.expoOut(0.35)) { lastTrashed = [] }
+        scan()
+    }
+
     private func complete(_ items: [DownloadItem]) {
         completed = Array((items + completed.filter { c in !items.contains { $0.url == c.url } }).prefix(5))
         guard tracked.isEmpty, let last = items.last else { return }
@@ -221,6 +261,18 @@ final class DownloadsService: ObservableObject {
 struct DownloadsModule: View {
     @ObservedObject private var service = DownloadsService.shared
     @Environment(\.theme) private var theme
+    @State private var selecting = false
+    @State private var selection = Set<URL>()
+
+    private var justDone: [DownloadItem] {
+        service.completed.filter { c in !service.recent.prefix(3).contains { $0.url == c.url } }
+    }
+
+    /// Every finished download on screen, once each.
+    private var selectable: [URL] {
+        var seen = Set<URL>()
+        return (justDone + service.recent).map(\.url).filter { seen.insert($0).inserted }
+    }
 
     var body: some View {
         Group {
@@ -239,39 +291,106 @@ struct DownloadsModule: View {
                     .padding(.bottom, 12)
                 }
             } else {
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if !service.active.isEmpty {
-                            section("Downloading")
-                            ForEach(service.active) { ActiveRow(item: $0) }
-                        }
-                        let justDone = service.completed.filter { c in
-                            !service.recent.prefix(3).contains { $0.url == c.url }
-                        }
-                        if !justDone.isEmpty {
-                            section("Just finished")
-                            ForEach(justDone) { DownloadRow(item: $0, highlight: true) }
-                        }
-                        section("Recent")
-                        if service.recent.isEmpty {
-                            EmptyState(icon: "arrow.down.circle", title: "No downloads yet",
-                                       subtitle: "Files you download will appear here with live progress.")
-                                .frame(height: 160)
-                        } else {
-                            TimelineView(.periodic(from: .now, by: 30)) { _ in
-                                VStack(spacing: 6) {
-                                    ForEach(service.recent) { item in
-                                        DownloadRow(item: item,
-                                                    highlight: service.completed.contains { $0.url == item.url })
+                ZStack(alignment: .bottom) {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            if !service.active.isEmpty {
+                                section("Downloading")
+                                ForEach(service.active) { ActiveRow(item: $0) }
+                            }
+                            if !justDone.isEmpty {
+                                section("Just finished")
+                                ForEach(justDone) { row($0, highlight: true) }
+                            }
+                            section("Recent")
+                            if service.recent.isEmpty {
+                                EmptyState(icon: "arrow.down.circle", title: "No downloads yet",
+                                           subtitle: "Files you download will appear here with live progress.")
+                                    .frame(height: 160)
+                            } else {
+                                TimelineView(.periodic(from: .now, by: 30)) { _ in
+                                    VStack(spacing: 6) {
+                                        ForEach(service.recent) { item in
+                                            row(item, highlight: service.completed.contains { $0.url == item.url })
+                                        }
                                     }
                                 }
                             }
                         }
+                        .padding(.bottom, selecting || !service.lastTrashed.isEmpty ? 48 : 0)
                     }
+                    bottomBar
                 }
+                .animation(Motion.expoOut(0.35), value: selecting)
             }
         }
         .onAppear { service.rescan() }
+        .onChange(of: service.recent) { _, _ in
+            // Forget files that left the folder; leave select mode once nothing is left.
+            selection.formIntersection(selectable)
+            if selectable.isEmpty { selecting = false }
+        }
+    }
+
+    private func row(_ item: DownloadItem, highlight: Bool) -> some View {
+        DownloadRow(item: item, highlight: highlight, selecting: selecting,
+                    selected: selection.contains(item.url)) {
+            withAnimation(Motion.pop) {
+                if selection.contains(item.url) { selection.remove(item.url) } else { selection.insert(item.url) }
+            }
+        }
+    }
+
+    // MARK: Bottom bar (selection, undo)
+
+    @ViewBuilder
+    private var bottomBar: some View {
+        if selecting {
+            let all = selectable
+            let allSelected = !all.isEmpty && selection.count == all.count
+            HStack(spacing: 10) {
+                Text(selection.isEmpty ? "Tap downloads to select" : "\(selection.count) selected")
+                    .font(.system(size: 12, weight: .semibold))
+                Button(allSelected ? "Deselect all" : "Select all") {
+                    withAnimation(Motion.pop) { selection = allSelected ? [] : Set(all) }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 12))
+                .foregroundStyle(theme.accent)
+                Spacer()
+                Button {
+                    service.trash(Array(selection))
+                    selection.removeAll()
+                    selecting = false
+                } label: {
+                    Label("Delete", systemImage: "trash.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Capsule().fill(Color.red.opacity(selection.isEmpty ? 0.35 : 0.9)))
+                }
+                .buttonStyle(.plain)
+                .disabled(selection.isEmpty)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .background(Capsule().fill(theme.surface).shadow(color: .black.opacity(0.4), radius: 10, y: 4))
+            .overlay(Capsule().strokeBorder(theme.border, lineWidth: 0.8))
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if !service.lastTrashed.isEmpty {
+            HStack(spacing: 10) {
+                Image(systemName: "trash").foregroundStyle(theme.secondaryText)
+                Text(service.lastTrashed.count == 1 ? "Moved to Trash" : "Moved \(service.lastTrashed.count) to Trash")
+                    .font(.system(size: 12, weight: .semibold))
+                Button("Undo") { service.undoTrash() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(theme.accent)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .background(Capsule().fill(theme.surface).shadow(color: .black.opacity(0.4), radius: 10, y: 4))
+            .overlay(Capsule().strokeBorder(theme.border, lineWidth: 0.8))
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
     }
 
     private func section(_ title: String) -> some View {
@@ -282,6 +401,16 @@ struct DownloadsModule: View {
                 .foregroundStyle(theme.secondaryText)
             Spacer()
             if title == "Recent" {
+                if !selectable.isEmpty {
+                    Button(selecting ? "Done" : "Select") {
+                        selecting.toggle()
+                        if !selecting { selection.removeAll() }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(theme.accent)
+                    .padding(.trailing, 6)
+                }
                 Button("Open Downloads") { NSWorkspace.shared.open(service.folder) }
                     .buttonStyle(.plain)
                     .font(.system(size: 11, weight: .medium))
@@ -357,6 +486,9 @@ private struct ActiveRow: View {
 private struct DownloadRow: View {
     let item: DownloadItem
     var highlight = false
+    var selecting = false
+    var selected = false
+    var onToggle: () -> Void = {}
     @Environment(\.theme) private var theme
     @State private var copied = false
 
@@ -364,6 +496,12 @@ private struct DownloadRow: View {
         let isImage = FileMeta.isImage(item.url)
         ListRow {
             HStack(spacing: 10) {
+                if selecting {
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(selected ? theme.accent : theme.secondaryText)
+                        .transition(.scale.combined(with: .opacity))
+                }
                 if isImage {
                     FileThumbnailView(url: item.url, size: CGSize(width: 60, height: 60), contentMode: .fill)
                         .frame(width: 30, height: 30)
@@ -392,34 +530,43 @@ private struct DownloadRow: View {
                     }
                 }
                 Spacer(minLength: 6)
-                if isImage {
-                    IconButton(systemName: copied ? "checkmark" : "doc.on.doc", size: 26, help: "Copy image") {
-                        FileMeta.copyFiles([item.url])
-                        withAnimation(.easeOut(duration: 0.15)) { copied = true }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            withAnimation(.easeOut(duration: 0.15)) { copied = false }
+                if !selecting {
+                    if isImage {
+                        IconButton(systemName: copied ? "checkmark" : "doc.on.doc", size: 26, help: "Copy image") {
+                            FileMeta.copyFiles([item.url])
+                            withAnimation(.easeOut(duration: 0.15)) { copied = true }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                withAnimation(.easeOut(duration: 0.15)) { copied = false }
+                            }
                         }
                     }
-                }
-                IconButton(systemName: "magnifyingglass", size: 26, help: "Reveal in Finder") {
-                    FileMeta.reveal([item.url])
-                }
-                IconButton(systemName: "arrow.up.forward.app", size: 26, help: "Open") {
-                    NSWorkspace.shared.open(item.url)
+                    IconButton(systemName: "magnifyingglass", size: 26, help: "Reveal in Finder") {
+                        FileMeta.reveal([item.url])
+                    }
+                    IconButton(systemName: "arrow.up.forward.app", size: 26, help: "Open") {
+                        NSWorkspace.shared.open(item.url)
+                    }
+                    IconButton(systemName: "trash", size: 26, help: "Move to Trash") {
+                        DownloadsService.shared.trash([item.url])
+                    }
                 }
             }
         }
+        .overlay {
+            if selecting {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(selected ? theme.accent : .clear, lineWidth: 1.5)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { if selecting { onToggle() } }
         .onDrag { NSItemProvider(contentsOf: item.url) ?? NSItemProvider(object: item.url as NSURL) }
         .contextMenu {
             Button("Open") { NSWorkspace.shared.open(item.url) }
             Button("Reveal in Finder") { FileMeta.reveal([item.url]) }
             Button("Copy") { FileMeta.copyFiles([item.url]) }
             Divider()
-            Button("Move to Trash") {
-                NSWorkspace.shared.recycle([item.url]) { _, _ in
-                    DispatchQueue.main.async { MainActor.assumeIsolated { DownloadsService.shared.scan() } }
-                }
-            }
+            Button("Move to Trash") { DownloadsService.shared.trash([item.url]) }
         }
     }
 }
