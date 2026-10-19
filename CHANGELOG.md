@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.7 — 2026-10-19
+
+**Download:** [Purrch-1.0.7.dmg](https://github.com/Mishra-coder/purrch-macos_app/releases/download/v1.0.7/Purrch-1.0.7.dmg)
+
+- Downloads: delete files one at a time, pick several, or clear the whole list. Each row has a **Trash** button. To pick files, click **Select** next to Recent, tick the ones you want (or **Select all**), then click **Delete**.
+- Deleted downloads go to the Trash, never straight off your Mac. **Undo** shows for a few seconds to put them back.
+
 ## 1.0.6 — 2026-10-19
 
 **Download:** [Purrch-1.0.6.dmg](https://github.com/Mishra-coder/purrch-macos_app/releases/download/v1.0.6/Purrch-1.0.6.dmg)
