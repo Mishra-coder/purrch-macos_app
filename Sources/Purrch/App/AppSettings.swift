@@ -88,6 +88,20 @@ final class AppSettings: ObservableObject {
         stripeKey = Keychain.get("stripe")
         plausibleKey = Keychain.get("plausible")
         launchAtLogin = SMAppService.mainApp.status == .enabled
+
+        // Once opened, Purrch should keep coming back after a restart, like other menu-bar apps.
+        // Register the login item on the first launch only, so turning it off later sticks.
+        if !d.bool(forKey: "launchAtLoginDefaulted") {
+            d.set(true, forKey: "launchAtLoginDefaulted")
+            if !launchAtLogin {
+                do {
+                    try SMAppService.mainApp.register()
+                } catch {
+                    NSLog("Purrch launch-at-login: \(error.localizedDescription)")
+                }
+                launchAtLogin = SMAppService.mainApp.status == .enabled
+            }
+        }
     }
 
     var enabledModules: [ModuleID] { moduleOrder.filter { !disabledModules.contains($0) } }

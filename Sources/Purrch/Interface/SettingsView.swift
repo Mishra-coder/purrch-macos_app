@@ -70,7 +70,7 @@ struct SettingsView: View {
             toggle("Hide in full screen", "Get out of the way of full-screen apps and videos.", $settings.hideInFullscreen)
             toggle("Live activities", "Music, timers, downloads and messages in the closed notch.", $settings.showLiveActivities)
             toggle("Video on hover", "Hovering the notch jumps straight to the playing YouTube video instead of your last tool.", $settings.videoPeekOnHover)
-            toggle("Launch at login", "Start Purrch when you log in.", $settings.launchAtLogin)
+            toggle("Launch at login", "Start Purrch automatically after a restart or log in.", $settings.launchAtLogin)
         case .modules:
             HStack {
                 Text("Turn tools on or off. Drag icons in the tab bar to reorder them.")
