@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.5 — 2026-10-19
+
+**Download:** [Purrch-1.0.5.dmg](https://github.com/Mishra-coder/purrch-macos_app/releases/download/v1.0.5/Purrch-1.0.5.dmg)
+
+- Purrch now starts on its own after a restart or shutdown. The first time you open it, it adds itself to your login items, so you don't have to open it again. To stop this, turn off **Launch at login** in Settings → Behaviour, or remove Purrch in System Settings → General → Login Items. Purrch won't turn it back on.
+
 ## 1.0.4 — 2026-10-18
 
 **Download:** [Purrch-1.0.4.dmg](https://github.com/Mishra-coder/purrch-macos_app/releases/download/v1.0.4/Purrch-1.0.4.dmg)
