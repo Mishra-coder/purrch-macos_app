@@ -358,13 +358,21 @@ private struct DownloadRow: View {
     let item: DownloadItem
     var highlight = false
     @Environment(\.theme) private var theme
+    @State private var copied = false
 
     var body: some View {
+        let isImage = FileMeta.isImage(item.url)
         ListRow {
             HStack(spacing: 10) {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
-                    .resizable()
-                    .frame(width: 30, height: 30)
+                if isImage {
+                    FileThumbnailView(url: item.url, size: CGSize(width: 60, height: 60), contentMode: .fill)
+                        .frame(width: 30, height: 30)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                } else {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
+                        .resizable()
+                        .frame(width: 30, height: 30)
+                }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.name)
                         .font(.system(size: 13, weight: .semibold))
@@ -384,6 +392,15 @@ private struct DownloadRow: View {
                     }
                 }
                 Spacer(minLength: 6)
+                if isImage {
+                    IconButton(systemName: copied ? "checkmark" : "doc.on.doc", size: 26, help: "Copy image") {
+                        FileMeta.copyFiles([item.url])
+                        withAnimation(.easeOut(duration: 0.15)) { copied = true }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            withAnimation(.easeOut(duration: 0.15)) { copied = false }
+                        }
+                    }
+                }
                 IconButton(systemName: "magnifyingglass", size: 26, help: "Reveal in Finder") {
                     FileMeta.reveal([item.url])
                 }

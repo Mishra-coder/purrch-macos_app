@@ -102,9 +102,25 @@ enum FileMeta {
         NSWorkspace.shared.activateFileViewerSelecting(urls)
     }
 
+    static func isImage(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.contentTypeKey]).contentType)?.conforms(to: .image) ?? false
+    }
+
+    /// Copies the files. A single image is copied as pixels instead, so ⌘V pastes the picture into chats and docs
+    /// (most apps only read the first pasteboard item and ignore an image sitting behind a file URL).
     static func copyFiles(_ urls: [URL]) {
         let pb = NSPasteboard.general
         pb.clearContents()
+        if urls.count == 1, let url = urls.first, isImage(url),
+           let tiff = NSImage(contentsOf: url)?.tiffRepresentation {
+            let item = NSPasteboardItem()
+            if let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+                item.setData(png, forType: .png)
+            }
+            item.setData(tiff, forType: .tiff)
+            pb.writeObjects([item])
+            return
+        }
         pb.writeObjects(urls as [NSURL])
     }
 
