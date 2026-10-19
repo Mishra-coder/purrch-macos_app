@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.6 — 2026-10-19
+
+**Download:** [Purrch-1.0.6.dmg](https://github.com/Mishra-coder/purrch-macos_app/releases/download/v1.0.6/Purrch-1.0.6.dmg)
+
+- Downloads: images now show a thumbnail and a **Copy** button. Click it, then press ⌘V in a chat, document or browser to paste the picture itself.
+- Right-click **Copy** on an image in Downloads or the Shelf now copies the picture, so ⌘V pastes it into chats and documents. Before, it copied only the file, and most apps pasted nothing. Other files still copy as files.
+
 ## 1.0.5 — 2026-10-19
 
 **Download:** [Purrch-1.0.5.dmg](https://github.com/Mishra-coder/purrch-macos_app/releases/download/v1.0.5/Purrch-1.0.5.dmg)
