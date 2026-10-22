@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -26,6 +27,8 @@ public partial class NotchWindow : Window
     private DateTime? _leaveStart;
     private bool _wasButtonDown;
     private IntPtr _hwnd;
+    /// Right-click menus open as popups that can reach outside the panel; keep it open meanwhile.
+    private int _openMenus;
 
     public NotchWindow()
     {
@@ -42,6 +45,8 @@ public partial class NotchWindow : Window
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
 
         Body.MouseLeftButtonDown += OnBodyMouseDown;
+        AddHandler(ContextMenu.OpenedEvent, new RoutedEventHandler((_, _) => _openMenus++));
+        AddHandler(ContextMenu.ClosedEvent, new RoutedEventHandler((_, _) => _openMenus = Math.Max(0, _openMenus - 1)));
         KeyDown += OnKeyDown;
         SourceInitialized += OnSourceInitialized;
         Loaded += (_, _) =>
@@ -299,6 +304,11 @@ public partial class NotchWindow : Window
         }
 
         _hoverStart = null;
+        if (_openMenus > 0)
+        {
+            _leaveStart = null;
+            return;
+        }
         var inside = ShapeRect(18).Contains(mouse);
         if (pressed && !ShapeRect().Contains(mouse))
         {

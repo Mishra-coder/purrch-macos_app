@@ -1,3 +1,4 @@
+using Purrch.Features.Clipboard;
 using Purrch.Features.Timers;
 
 namespace Purrch.Core;
@@ -8,5 +9,6 @@ public static class BackgroundServices
     public static void Start()
     {
         _ = TimerService.Shared;
+        ClipboardService.Shared.Start();
     }
 }

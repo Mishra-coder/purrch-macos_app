@@ -90,6 +90,74 @@ public static class Ui
         return button;
     }
 
+    /// Rounded search box with a magnifier and a placeholder. Calls back on every change.
+    public static Border SearchField(string placeholder, Action<string> changed, out TextBox box)
+    {
+        var input = new TextBox
+        {
+            BorderThickness = new Thickness(0),
+            Background = Brushes.Transparent,
+            FontSize = 13,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Padding = new Thickness(0),
+        };
+        input.SetResourceReference(Control.ForegroundProperty, ThemeResources.Text);
+        input.SetResourceReference(TextBoxBase.CaretBrushProperty, ThemeResources.Text);
+        input.SetResourceReference(TextBoxBase.SelectionBrushProperty, ThemeResources.Accent);
+
+        var hint = Text(placeholder, 13, ThemeResources.SecondaryText);
+        hint.IsHitTestVisible = false;
+        input.TextChanged += (_, _) =>
+        {
+            hint.Visibility = input.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+            changed(input.Text);
+        };
+
+        var field = new Grid();
+        field.Children.Add(hint);
+        field.Children.Add(input);
+
+        var row = new DockPanel();
+        var glass = Glyph("\uE721", 12, ThemeResources.SecondaryText);
+        glass.Margin = new Thickness(0, 0, 8, 0);
+        DockPanel.SetDock(glass, Dock.Left);
+        row.Children.Add(glass);
+        row.Children.Add(field);
+
+        var border = new Border
+        {
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(10, 0, 10, 0),
+            Height = 34,
+            BorderThickness = new Thickness(0.8),
+            Child = row,
+            Cursor = System.Windows.Input.Cursors.IBeam,
+        };
+        border.SetResourceReference(Border.BackgroundProperty, ThemeResources.Surface);
+        border.SetResourceReference(Border.BorderBrushProperty, ThemeResources.Hairline);
+        border.MouseLeftButtonDown += (_, _) => input.Focus();
+        box = input;
+        return border;
+    }
+
+    /// Centred icon, title and hint for an empty list.
+    public static UIElement EmptyState(string glyph, string title, string subtitle)
+    {
+        var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var icon = Glyph(glyph, 26, ThemeResources.SecondaryText);
+        icon.Opacity = 0.7;
+        stack.Children.Add(icon);
+        var heading = Text(title, 13, weight: FontWeights.SemiBold);
+        heading.HorizontalAlignment = HorizontalAlignment.Center;
+        heading.Margin = new Thickness(0, 10, 0, 2);
+        stack.Children.Add(heading);
+        var hint = Text(subtitle, 11.5, ThemeResources.SecondaryText);
+        hint.HorizontalAlignment = HorizontalAlignment.Center;
+        hint.TextAlignment = TextAlignment.Center;
+        stack.Children.Add(hint);
+        return stack;
+    }
+
     public static ToggleButton Switch(bool isOn, Action<bool> changed, bool enabled = true)
     {
         var toggle = new ToggleButton

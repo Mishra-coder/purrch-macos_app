@@ -166,6 +166,7 @@ public partial class ExpandedView : UserControl
         return _state.Selected switch
         {
             ModuleId.Timers => new Features.Timers.TimersModule(),
+            ModuleId.Clipboard => new Features.Clipboard.ClipboardModule(),
             _ => new ModulePlaceholder(_state.Selected, _settings.Theme.Glow),
         };
     }

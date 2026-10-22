@@ -10,8 +10,8 @@ The project builds on macOS, but the app only runs on Windows 10 (1809 or later)
 | --- | --- | --- |
 | 1 | Pill window, expand and collapse, tab bar, settings, themes, tray icon, launch at startup | Done; not yet run on Windows |
 | 2 | Timers (Pomodoro, countdown, stopwatch, water reminder) | Done; not yet run on Windows |
-| 3 | Clipboard history | Next |
-| 4 | Notes and Scratchpad | |
+| 3 | Clipboard history | Done; not yet run on Windows |
+| 4 | Notes and Scratchpad | Next |
 | 5 | Now Playing (Windows media session) | |
 | 6 | System (CPU, memory, disk, network, battery) | |
 | 7 | Assistant and Translate (Claude, OpenAI or Gemini, your own key) | |
@@ -88,6 +88,16 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Stopwatch: start, lap, pause and reset. Laps are listed newest first.
 - [ ] Water: tapping drops fills them, and the count is still the same after restarting Purrch. With the switch on, a reminder notification comes every 30 minutes.
 
+**Clipboard**
+
+- [ ] Copying text, a link, a file in File Explorer and a screenshot (Win+Shift+S) each adds a row with the right icon, tag, size, app name and time.
+- [ ] Copying the same thing again moves it to the top instead of adding a duplicate.
+- [ ] Clicking a row copies it back (a "Copied" mark appears) and Ctrl+V pastes it in another app, including files and images. That copy doesn't add a new row.
+- [ ] Search filters as you type. The pin keeps a row at the top. The bin clears everything that isn't pinned.
+- [ ] Right-click shows Copy, Pin, Show in File Explorer (files), Open Link (links) and Delete. The panel stays open while the menu is open.
+- [ ] Dragging a row into Notepad, a chat box or a folder drops the text, file or image.
+- [ ] A password copied from a password manager (Bitwarden, 1Password, KeePass) is **not** recorded.
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -101,6 +111,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | --- | --- |
 | Settings | `%APPDATA%\Purrch\settings.json` |
 | Timer lengths, pomodoros done, water | `%APPDATA%\Purrch\timers.json`, `water.json` |
+| Clipboard history | `%APPDATA%\Purrch\clipboard.json`, images in `clipboard-images\` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys (from step 7) | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |

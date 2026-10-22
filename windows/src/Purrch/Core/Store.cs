@@ -46,6 +46,28 @@ public static class Store
 
 public static class Format
 {
+    private static readonly string[] Units = { "bytes", "KB", "MB", "GB", "TB" };
+
+    /// "512 bytes", "1.4 MB": decimal units, as the Mac app shows them.
+    public static string Bytes(long count)
+    {
+        if (count < 1000) return count == 1 ? "1 byte" : $"{count} bytes";
+        double value = count;
+        var unit = 0;
+        while (value >= 1000 && unit < Units.Length - 1) { value /= 1000; unit++; }
+        return $"{value:0.#} {Units[unit]}";
+    }
+
+    /// "now", "5m", "3h", "2d".
+    public static string Relative(DateTime date)
+    {
+        var seconds = (int)(DateTime.Now - date).TotalSeconds;
+        if (seconds < 60) return "now";
+        if (seconds < 3600) return $"{seconds / 60}m";
+        if (seconds < 86400) return $"{seconds / 3600}h";
+        return $"{seconds / 86400}d";
+    }
+
     /// "4:05", or "1:04:05" from an hour up.
     public static string Duration(double seconds)
     {
