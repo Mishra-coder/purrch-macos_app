@@ -172,6 +172,7 @@ public partial class ExpandedView : UserControl
             ModuleId.NowPlaying => new Features.Media.NowPlayingModule(),
             ModuleId.System => new Features.Insights.SystemModule(),
             ModuleId.Assistant => new Features.Assistant.AssistantModule(),
+            ModuleId.Translate => new Features.Translate.TranslateModule(),
             _ => new ModulePlaceholder(_state.Selected, _settings.Theme.Glow),
         };
     }

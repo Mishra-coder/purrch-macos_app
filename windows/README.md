@@ -14,7 +14,7 @@ The project builds on macOS, but the app only runs on Windows 10 (1809 or later)
 | 4 | Notes and Scratchpad | Done; not yet run on Windows |
 | 5 | Now Playing (Windows media session) | Done; not yet run on Windows |
 | 6 | System (CPU, memory, disk, network, battery) | Done; not yet run on Windows |
-| 7 | Assistant and Translate (Claude, OpenAI or Gemini, your own key) | Next |
+| 7 | Assistant and Translate (Claude, OpenAI or Gemini, your own key) | Done; not yet run on Windows |
 
 All 24 modules from the Mac app are in the tab bar. The ones not built yet show a "Coming soon" card.
 
@@ -125,6 +125,13 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] The provider capsule switches between Claude, OpenAI and Gemini; for Claude, "Web search" lets it answer questions about recent events.
 - [ ] A wrong key gives a clear "rejected the API key" message, and no internet gives "Couldn't reach ...".
 
+**Translate**
+
+- [ ] Typing "kal milte hain yaar" with "Detect language" translates it to English after a short pause and shows "Detected: Hinglish". Changing the target language translates again.
+- [ ] Swap (with a fixed source language) swaps the languages and moves the translation into the input.
+- [ ] Fix grammar, Improve, Tone (with a tone menu) and Shorten run on the button or Ctrl+Enter; changed words are highlighted and Accept puts the result in the input. Copy and Clear work.
+- [ ] The provider capsule can use a different provider from the Assistant; a missing key shows where to add it.
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -137,6 +144,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | What | Where |
 | --- | --- |
 | Settings | `%APPDATA%\Purrch\settings.json` |
+| Translate languages, mode and provider | `%APPDATA%\Purrch\translate.json` |
 | Timer lengths, pomodoros done, water | `%APPDATA%\Purrch\timers.json`, `water.json` |
 | Clipboard history | `%APPDATA%\Purrch\clipboard.json`, images in `clipboard-images\` |
 | Notes, Scratchpad | `%APPDATA%\Purrch\notes.json`, `scratchpad.json` |
