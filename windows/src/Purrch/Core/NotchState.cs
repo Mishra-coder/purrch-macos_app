@@ -24,7 +24,16 @@ public sealed class NotchState : INotifyPropertyChanged
     public bool IsPeeking { get => _isPeeking; private set => Set(ref _isPeeking, value); }
     /// Hidden while a full-screen app covers the primary screen.
     public bool IsHidden { get => _isHidden; set => Set(ref _isHidden, value); }
-    public bool ShowSettings { get => _showSettings; set => Set(ref _showSettings, value); }
+    public bool ShowSettings
+    {
+        get => _showSettings;
+        set
+        {
+            // Leaving settings after turning off the module on screen lands on Home.
+            if (!value) EnsureSelectionEnabled();
+            Set(ref _showSettings, value);
+        }
+    }
 
     /// Opened from the tray or a second launch: stay open until the pointer has visited the panel once.
     public bool HoldUntilHovered { get; set; }
