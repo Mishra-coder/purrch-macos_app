@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- Only for the tray icon (NotifyIcon); WPF has none of its own. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- Lets the project build on macOS and Linux; it still only runs on Windows. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Purrch</RootNamespace>
+    <AssemblyName>Purrch</AssemblyName>
+    <ApplicationIcon>Assets\Purrch.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- WFAC010 is a WinForms hint; WPF takes per-monitor DPI from the manifest. -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+    <Version>0.1.0</Version>
+    <Product>Purrch</Product>
+    <Company>Devendra Mishra</Company>
+    <Copyright>Copyright © 2026 Devendra Mishra</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WPF and WinForms share type names (Application, Point, Color); keep WinForms explicit. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Mascot.png" />
+    <Resource Include="Assets\Tray.ico" />
+  </ItemGroup>
+
+</Project>

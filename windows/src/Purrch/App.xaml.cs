@@ -1,0 +1,52 @@
+using System.Windows;
+using System.Windows.Threading;
+using Purrch.Core;
+
+namespace Purrch;
+
+public partial class App : Application
+{
+    private const string MutexName = @"Local\Purrch.SingleInstance";
+    private const string OpenEventName = @"Local\Purrch.Open";
+
+    private Mutex? _instanceMutex;
+    private EventWaitHandle? _openEvent;
+
+    /// Raised on the UI thread when Purrch is launched a second time.
+    public event Action? OpenRequested;
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        _instanceMutex = new Mutex(initiallyOwned: true, MutexName, out var isFirst);
+        if (!isFirst)
+        {
+            // Already running: ask that copy to open its panel and leave.
+            try { EventWaitHandle.OpenExisting(OpenEventName).Set(); }
+            catch (WaitHandleCannotBeOpenedException) { }
+            Shutdown();
+            return;
+        }
+
+        _openEvent = new EventWaitHandle(false, EventResetMode.AutoReset, OpenEventName);
+        ThreadPool.RegisterWaitForSingleObject(_openEvent, (_, _) =>
+            Dispatcher.BeginInvoke(() => OpenRequested?.Invoke()), null, Timeout.Infinite, executeOnlyOnce: false);
+
+        DispatcherUnhandledException += OnUnhandledException;
+        base.OnStartup(e);
+        Log.Write("Purrch started");
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _openEvent?.Dispose();
+        _instanceMutex?.Dispose();
+        base.OnExit(e);
+    }
+
+    private static void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        // Keep the pill alive; one broken module shouldn't take the whole app down.
+        Log.Write($"Unhandled: {e.Exception}");
+        e.Handled = true;
+    }
+}
