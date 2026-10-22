@@ -13,8 +13,8 @@ The project builds on macOS, but the app only runs on Windows 10 (1809 or later)
 | 3 | Clipboard history | Done; not yet run on Windows |
 | 4 | Notes and Scratchpad | Done; not yet run on Windows |
 | 5 | Now Playing (Windows media session) | Done; not yet run on Windows |
-| 6 | System (CPU, memory, disk, network, battery) | Next |
-| 7 | Assistant and Translate (Claude, OpenAI or Gemini, your own key) | |
+| 6 | System (CPU, memory, disk, network, battery) | Done; not yet run on Windows |
+| 7 | Assistant and Translate (Claude, OpenAI or Gemini, your own key) | Next |
 
 All 24 modules from the Mac app are in the tab bar. The ones not built yet show a "Coming soon" card.
 
@@ -110,6 +110,13 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Play/pause, previous and next control that app. Clicking or dragging along the progress bar jumps in the track (Spotify and Media Player; many websites don't allow it).
 - [ ] While music plays, the closed pill shows the artwork on the left and moving bars on the right. A running timer takes priority over music.
 - [ ] With nothing playing, the module says "Nothing playing".
+
+**System**
+
+- [ ] CPU load and its 60-second chart match Task Manager → Performance roughly. Memory, and free space on the Windows drive, match too.
+- [ ] Downloading something large shows the download rate and the chart rising.
+- [ ] On a laptop: battery %, Charging / Plugged in / On battery, health and time remaining look right; unplugging updates within a second or two. On a desktop or VM it says "No battery".
+- [ ] Machine shows uptime, the Windows version and the PC name.
 
 **Tray, startup and full screen**
 

@@ -170,6 +170,7 @@ public partial class ExpandedView : UserControl
             ModuleId.Notes => new Features.Notes.NotesModule(),
             ModuleId.Scratchpad => new Features.Notes.ScratchpadModule(),
             ModuleId.NowPlaying => new Features.Media.NowPlayingModule(),
+            ModuleId.System => new Features.Insights.SystemModule(),
             _ => new ModulePlaceholder(_state.Selected, _settings.Theme.Glow),
         };
     }
