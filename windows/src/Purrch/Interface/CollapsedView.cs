@@ -50,9 +50,9 @@ public sealed class CollapsedView : Grid
 
     private static UIElement? Leading(LiveActivity a) => a.Kind switch
     {
-        LiveActivityKind.Timer => Glyph(a.Glyph.Length > 0 ? a.Glyph : "", 13),
-        LiveActivityKind.Download => Glyph("", 14),
-        LiveActivityKind.Music => Glyph("", 13),
+        LiveActivityKind.Timer => Glyph(a.Glyph.Length > 0 ? a.Glyph : "\uE916", 13),
+        LiveActivityKind.Download => Glyph("\uE896", 14),
+        LiveActivityKind.Music => Glyph("\uE8D6", 13),
         _ => null,
     };
 

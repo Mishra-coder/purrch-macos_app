@@ -12,17 +12,21 @@ public partial class ExpandedView : UserControl
 {
     private readonly NotchState _state = NotchState.Shared;
     private readonly AppSettings _settings = AppSettings.Shared;
+    private readonly TabBar _tabBar = new();
     private string? _contentKey;
     private UIElement? _content;
 
     public ExpandedView()
     {
         InitializeComponent();
+        TabBarArea.Children.Add(_tabBar);
         _state.PropertyChanged += OnStateChanged;
         _settings.PropertyChanged += OnSettingsChanged;
         RefreshHeader();
         RefreshPin();
+        RefreshSettingsButton();
         RefreshContent(animated: false);
+        RefreshOnboarding();
     }
 
     /// Staggered entrance each time the panel opens: header, then content, then the tab bar.
@@ -52,6 +56,7 @@ public partial class ExpandedView : UserControl
             case nameof(NotchState.Selected):
             case nameof(NotchState.ShowSettings):
                 RefreshHeader();
+                RefreshSettingsButton();
                 RefreshContent(animated: true);
                 break;
             case nameof(NotchState.IsPinned):
@@ -62,12 +67,19 @@ public partial class ExpandedView : UserControl
 
     private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(AppSettings.ThemeId))
+        switch (e.PropertyName)
         {
-            RefreshHeader();
-            RefreshPin();
-            // Module content picks colours from the theme when it is built.
-            RefreshContent(animated: false, force: true);
+            case nameof(AppSettings.ThemeId):
+                RefreshHeader();
+                RefreshPin();
+                // Module content picks colours from the theme when it is built. Settings and the
+                // welcome screen hold the theme picker, which recolours itself and must stay put.
+                if (_contentKey is not ("settings" or "onboarding")) RefreshContent(animated: false, force: true);
+                break;
+            case nameof(AppSettings.HasCompletedOnboarding):
+                RefreshContent(animated: true);
+                RefreshOnboarding();
+                break;
         }
     }
 
@@ -75,7 +87,7 @@ public partial class ExpandedView : UserControl
     {
         var theme = _settings.Theme;
         var module = _state.Selected;
-        BadgeGlyph.Text = _state.ShowSettings ? "" : module.Glyph();
+        BadgeGlyph.Text = _state.ShowSettings ? "\uE713" : module.Glyph();
         BadgeGlyph.SetResourceReference(TextBlock.ForegroundProperty, theme.Glow ? ThemeResources.Background : ThemeResources.Accent);
         Badge.Effect = theme.Glow ? Glow(theme.AccentFor(module), 5) : null;
         TitleText.Text = _state.ShowSettings ? "Settings" : module.Title();
@@ -88,7 +100,7 @@ public partial class ExpandedView : UserControl
     private void RefreshPin()
     {
         var pinned = _state.IsPinned;
-        PinGlyph.Text = pinned ? "" : "";
+        PinGlyph.Text = pinned ? "\uE840" : "\uE718";
         PinLabel.Visibility = pinned ? Visibility.Visible : Visibility.Collapsed;
         PinPill.Padding = new Thickness(pinned ? 10 : 0, 0, pinned ? 10 : 0, 0);
         if (pinned) PinPill.SetResourceReference(Border.BackgroundProperty, ThemeResources.ThemeAccent);
@@ -101,9 +113,27 @@ public partial class ExpandedView : UserControl
 
     private void OnPinClick(object sender, RoutedEventArgs e) => _state.IsPinned = !_state.IsPinned;
 
+    private void OnSettingsClick(object sender, RoutedEventArgs e)
+    {
+        _state.SwitchDirection = 1;
+        _state.ShowSettings = !_state.ShowSettings;
+    }
+
+    private void RefreshSettingsButton()
+    {
+        SettingsGlyph.Text = _state.ShowSettings ? "\uE711" : "\uE713";
+        SettingsSpin.Animate(RotateTransform.AngleProperty, _state.ShowSettings ? 90 : 0, Motion.ExpoOut(0.45));
+    }
+
+    /// The tab bar waits until the welcome screen has been dismissed.
+    private void RefreshOnboarding() =>
+        TabBarArea.Visibility = _settings.HasCompletedOnboarding ? Visibility.Visible : Visibility.Collapsed;
+
     private void RefreshContent(bool animated, bool force = false)
     {
-        var key = _state.ShowSettings ? "settings" : _state.Selected.Key();
+        var key = !_settings.HasCompletedOnboarding ? "onboarding"
+            : _state.ShowSettings ? "settings"
+            : _state.Selected.Key();
         if (key == _contentKey && !force) return;
         _contentKey = key;
 
@@ -129,7 +159,12 @@ public partial class ExpandedView : UserControl
         previous.Animate(OpacityProperty, 0, Motion.ExpoOut(0.2), completed: () => ContentArea.Children.Remove(previous));
     }
 
-    private UIElement BuildContent() => new ModulePlaceholder(_state.Selected, _settings.Theme.Glow);
+    private UIElement BuildContent()
+    {
+        if (!_settings.HasCompletedOnboarding) return new OnboardingView();
+        if (_state.ShowSettings) return new SettingsView();
+        return new ModulePlaceholder(_state.Selected, _settings.Theme.Glow);
+    }
 
     internal static System.Windows.Media.Effects.DropShadowEffect Glow(Color color, double radius) => new()
     {

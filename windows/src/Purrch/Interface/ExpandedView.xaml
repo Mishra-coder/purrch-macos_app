@@ -45,6 +45,15 @@
                             </StackPanel>
                         </Border>
                     </Button>
+                    <Button x:Name="SettingsButton" Style="{StaticResource Purrch.PlainButton}" Click="OnSettingsClick"
+                            ToolTip="Settings" Width="26" Height="24">
+                        <TextBlock x:Name="SettingsGlyph" Style="{StaticResource Purrch.Glyph}" FontSize="11"
+                                   Text="&#xE713;" Foreground="{DynamicResource Purrch.Text}" RenderTransformOrigin="0.5,0.5">
+                            <TextBlock.RenderTransform>
+                                <RotateTransform x:Name="SettingsSpin" />
+                            </TextBlock.RenderTransform>
+                        </TextBlock>
+                    </Button>
                 </StackPanel>
             </Border>
         </Grid>

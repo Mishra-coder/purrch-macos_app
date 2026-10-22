@@ -39,4 +39,34 @@
         <Setter Property="CornerRadius" Value="20" />
     </Style>
 
+    <!-- On/off switch, the Windows counterpart of the Mac toggles. -->
+    <Style x:Key="Purrch.Switch" TargetType="ToggleButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Track" CornerRadius="10" Background="{DynamicResource Purrch.Hairline}"
+                            BorderBrush="{DynamicResource Purrch.SecondaryText}" BorderThickness="1">
+                        <Ellipse x:Name="Thumb" Width="12" Height="12" Margin="3,0" HorizontalAlignment="Left"
+                                 Fill="{DynamicResource Purrch.SecondaryText}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Track" Property="Background" Value="{DynamicResource Purrch.ThemeAccent}" />
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource Purrch.ThemeAccent}" />
+                            <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
+                            <Setter TargetName="Thumb" Property="Fill" Value="{DynamicResource Purrch.Background}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>
