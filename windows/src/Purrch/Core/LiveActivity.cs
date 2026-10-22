@@ -1,9 +1,12 @@
+using System.Windows.Media;
+
 namespace Purrch.Core;
 
 public enum LiveActivityKind { None, Timer, Download, Music }
 
 /// What the closed pill shows on either side: a running timer, a download, or music.
-public sealed record LiveActivity(LiveActivityKind Kind, string Label = "", string Glyph = "", double Progress = 0)
+public sealed record LiveActivity(LiveActivityKind Kind, string Label = "", string Glyph = "", double Progress = 0,
+                                  ImageSource? Artwork = null)
 {
     public static LiveActivity None { get; } = new(LiveActivityKind.None);
 

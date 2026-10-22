@@ -52,6 +52,13 @@ public sealed class CollapsedView : Grid
     {
         LiveActivityKind.Timer => Glyph(a.Glyph.Length > 0 ? a.Glyph : "\uE916", 13),
         LiveActivityKind.Download => Glyph("\uE896", 14),
+        LiveActivityKind.Music when a.Artwork != null => new Border
+        {
+            Width = 20,
+            Height = 20,
+            CornerRadius = new CornerRadius(5),
+            Background = new ImageBrush(a.Artwork) { Stretch = Stretch.UniformToFill },
+        },
         LiveActivityKind.Music => Glyph("\uE8D6", 13),
         _ => null,
     };

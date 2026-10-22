@@ -1,4 +1,5 @@
 using Purrch.Features.Clipboard;
+using Purrch.Features.Media;
 using Purrch.Features.Notes;
 using Purrch.Features.Timers;
 
@@ -11,6 +12,7 @@ public static class BackgroundServices
     {
         _ = TimerService.Shared;
         ClipboardService.Shared.Start();
+        NowPlayingService.Shared.Start();
     }
 
     /// Writes anything still waiting to be saved before Purrch quits.
