@@ -49,6 +49,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        if (_tray != null) BackgroundServices.Stop(); // a second copy that quit at once has nothing to save
         _tray?.Dispose();
         _openEvent?.Dispose();
         _instanceMutex?.Dispose();

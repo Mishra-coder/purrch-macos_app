@@ -1,4 +1,5 @@
 using Purrch.Features.Clipboard;
+using Purrch.Features.Notes;
 using Purrch.Features.Timers;
 
 namespace Purrch.Core;
@@ -10,5 +11,12 @@ public static class BackgroundServices
     {
         _ = TimerService.Shared;
         ClipboardService.Shared.Start();
+    }
+
+    /// Writes anything still waiting to be saved before Purrch quits.
+    public static void Stop()
+    {
+        NotesStore.Shared.Flush();
+        ScratchpadStore.Shared.Flush();
     }
 }

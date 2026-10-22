@@ -11,8 +11,8 @@ The project builds on macOS, but the app only runs on Windows 10 (1809 or later)
 | 1 | Pill window, expand and collapse, tab bar, settings, themes, tray icon, launch at startup | Done; not yet run on Windows |
 | 2 | Timers (Pomodoro, countdown, stopwatch, water reminder) | Done; not yet run on Windows |
 | 3 | Clipboard history | Done; not yet run on Windows |
-| 4 | Notes and Scratchpad | Next |
-| 5 | Now Playing (Windows media session) | |
+| 4 | Notes and Scratchpad | Done; not yet run on Windows |
+| 5 | Now Playing (Windows media session) | Next |
 | 6 | System (CPU, memory, disk, network, battery) | |
 | 7 | Assistant and Translate (Claude, OpenAI or Gemini, your own key) | |
 
@@ -98,6 +98,12 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Dragging a row into Notepad, a chat box or a folder drops the text, file or image.
 - [ ] A password copied from a password manager (Bitwarden, 1Password, KeePass) is **not** recorded.
 
+**Notes and Scratchpad**
+
+- [ ] Notes: + makes a new note; typing a title updates the list on the left. Enter in "Add an item" adds it and keeps the cursor there. Ticking an item strikes it through; "Clear done" removes ticked items. The toggle switches between checklist and text. Right-click a note to convert or delete it.
+- [ ] Scratchpad: typing is kept after quitting and reopening Purrch. Text size, monospaced font, Copy all and Clear (two clicks) work.
+- [ ] After typing in a note, moving the pointer away closes the panel and your next keystrokes go to the app you were in before.
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -112,6 +118,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Settings | `%APPDATA%\Purrch\settings.json` |
 | Timer lengths, pomodoros done, water | `%APPDATA%\Purrch\timers.json`, `water.json` |
 | Clipboard history | `%APPDATA%\Purrch\clipboard.json`, images in `clipboard-images\` |
+| Notes, Scratchpad | `%APPDATA%\Purrch\notes.json`, `scratchpad.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys (from step 7) | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |
@@ -147,6 +154,6 @@ How it maps to the Mac app:
 ## Known limitations
 
 - The pill always sits on the primary screen.
-- Clicking inside the open panel makes Purrch the active window, so the app you were in loses keyboard focus until you click back into it.
+- Clicking inside the open panel makes Purrch the active window. When the panel closes, keyboard focus goes back to the app you were in.
 - The closed pill shows running timers. Music and downloads come with Now Playing (step 5) and Downloads.
 - The exe is not code-signed, so SmartScreen warns on first run.

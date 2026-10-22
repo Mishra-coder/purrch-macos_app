@@ -140,6 +140,47 @@ public static class Ui
         return border;
     }
 
+    /// Borderless themed text box, for titles, list items and editors.
+    public static TextBox Input(string text, double size = 13, bool multiline = false, FontWeight? weight = null)
+    {
+        var box = new TextBox
+        {
+            Text = text,
+            FontSize = size,
+            FontWeight = weight ?? FontWeights.Normal,
+            BorderThickness = new Thickness(0),
+            Background = Brushes.Transparent,
+            Padding = new Thickness(0),
+            VerticalContentAlignment = multiline ? VerticalAlignment.Top : VerticalAlignment.Center,
+            AcceptsReturn = multiline,
+            AcceptsTab = multiline,
+            TextWrapping = multiline ? TextWrapping.Wrap : TextWrapping.NoWrap,
+            VerticalScrollBarVisibility = multiline ? ScrollBarVisibility.Hidden : ScrollBarVisibility.Disabled,
+        };
+        box.SetResourceReference(Control.ForegroundProperty, ThemeResources.Text);
+        box.SetResourceReference(TextBoxBase.CaretBrushProperty, ThemeResources.Text);
+        box.SetResourceReference(TextBoxBase.SelectionBrushProperty, ThemeResources.Accent);
+        return box;
+    }
+
+    /// Lays a grey placeholder over a text box while it is empty.
+    public static Grid WithPlaceholder(TextBox box, string placeholder, Thickness? inset = null)
+    {
+        var hint = Text(placeholder, box.FontSize, ThemeResources.SecondaryText);
+        hint.IsHitTestVisible = false;
+        hint.Opacity = 0.7;
+        hint.VerticalAlignment = box.AcceptsReturn ? VerticalAlignment.Top : VerticalAlignment.Center;
+        hint.Margin = inset ?? new Thickness(2, 0, 0, 0);
+        hint.FontFamily = box.FontFamily;
+        void Sync() => hint.Visibility = box.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        box.TextChanged += (_, _) => Sync();
+        Sync();
+        var grid = new Grid();
+        grid.Children.Add(box);
+        grid.Children.Add(hint);
+        return grid;
+    }
+
     /// Centred icon, title and hint for an empty list.
     public static UIElement EmptyState(string glyph, string title, string subtitle)
     {

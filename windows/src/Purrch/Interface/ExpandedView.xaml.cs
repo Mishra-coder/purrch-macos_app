@@ -167,6 +167,8 @@ public partial class ExpandedView : UserControl
         {
             ModuleId.Timers => new Features.Timers.TimersModule(),
             ModuleId.Clipboard => new Features.Clipboard.ClipboardModule(),
+            ModuleId.Notes => new Features.Notes.NotesModule(),
+            ModuleId.Scratchpad => new Features.Notes.ScratchpadModule(),
             _ => new ModulePlaceholder(_state.Selected, _settings.Theme.Glow),
         };
     }

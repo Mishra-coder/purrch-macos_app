@@ -14,18 +14,20 @@ public static class Store
 
     private static string PathFor(string name) => System.IO.Path.Combine(AppPaths.Root, name + ".json");
 
-    public static T Load<T>(string name) where T : new()
+    public static T Load<T>(string name) where T : new() => Load(name, new T());
+
+    public static T Load<T>(string name, T fallback)
     {
         try
         {
             var path = PathFor(name);
-            if (File.Exists(path)) return JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json) ?? new T();
+            if (File.Exists(path)) return JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json) ?? fallback;
         }
         catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
         {
             Log.Write($"{name}.json unreadable, using defaults: {e.Message}");
         }
-        return new T();
+        return fallback;
     }
 
     public static void Save<T>(string name, T value)
@@ -41,6 +43,34 @@ public static class Store
         {
             Log.Write($"{name}.json not saved: {e.Message}");
         }
+    }
+}
+
+/// Saves a moment after the last change, so typing doesn't write the file on every key.
+public sealed class DebouncedSaver
+{
+    private readonly System.Windows.Threading.DispatcherTimer _timer;
+    private readonly Action _save;
+
+    public DebouncedSaver(TimeSpan delay, Action save)
+    {
+        _save = save;
+        _timer = new System.Windows.Threading.DispatcherTimer { Interval = delay };
+        _timer.Tick += (_, _) => Flush();
+    }
+
+    public void Schedule()
+    {
+        _timer.Stop();
+        _timer.Start();
+    }
+
+    /// Saves now if a save is pending (on leaving the module and when Purrch quits).
+    public void Flush()
+    {
+        if (!_timer.IsEnabled) return;
+        _timer.Stop();
+        _save();
     }
 }
 
