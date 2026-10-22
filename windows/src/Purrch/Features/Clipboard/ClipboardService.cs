@@ -130,7 +130,7 @@ public sealed class ClipboardService
 
         try
         {
-            var source = ForegroundAppName();
+            var source = AppNames.Of(Native.GetForegroundWindow());
             var now = DateTime.Now;
 
             if (System.Windows.Clipboard.ContainsFileDropList())
@@ -220,32 +220,6 @@ public sealed class ClipboardService
             }
         }
         return false;
-    }
-
-    /// Name of the app in front, e.g. "Microsoft Edge" or "Notepad".
-    private static string? ForegroundAppName()
-    {
-        try
-        {
-            GetWindowThreadProcessId(Native.GetForegroundWindow(), out var pid);
-            if (pid == 0) return null;
-            using var process = Process.GetProcessById((int)pid);
-            if (process.Id == Environment.ProcessId) return null;
-            try
-            {
-                var description = process.MainModule?.FileVersionInfo.FileDescription;
-                if (!string.IsNullOrWhiteSpace(description)) return description;
-            }
-            catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
-            {
-                // Elevated or protected process: fall back to its name.
-            }
-            return process.ProcessName;
-        }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException)
-        {
-            return null;
-        }
     }
 
     /// Moves an identical existing item to the top. Returns true when found.
@@ -411,7 +385,4 @@ public sealed class ClipboardService
 
     [DllImport("user32.dll")]
     private static extern bool IsClipboardFormatAvailable(uint format);
-
-    [DllImport("user32.dll")]
-    private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
 }

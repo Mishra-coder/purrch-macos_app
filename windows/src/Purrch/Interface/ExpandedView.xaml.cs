@@ -91,7 +91,7 @@ public partial class ExpandedView : UserControl
         BadgeGlyph.SetResourceReference(TextBlock.ForegroundProperty, theme.Glow ? ThemeResources.Background : ThemeResources.Accent);
         Badge.Effect = theme.Glow ? Glow(theme.AccentFor(module), 5) : null;
         TitleText.Text = _state.ShowSettings ? "Settings" : module.Title();
-        SubtitleText.Text = _state.ShowSettings ? "Themes, modules and startup"
+        SubtitleText.Text = _state.ShowSettings ? "Themes, modules, AI keys and startup"
             : module == ModuleId.Home ? DateTime.Now.ToString("dddd, MMMM d")
             : module.Subtitle();
     }
@@ -171,6 +171,7 @@ public partial class ExpandedView : UserControl
             ModuleId.Scratchpad => new Features.Notes.ScratchpadModule(),
             ModuleId.NowPlaying => new Features.Media.NowPlayingModule(),
             ModuleId.System => new Features.Insights.SystemModule(),
+            ModuleId.Assistant => new Features.Assistant.AssistantModule(),
             _ => new ModulePlaceholder(_state.Selected, _settings.Theme.Glow),
         };
     }

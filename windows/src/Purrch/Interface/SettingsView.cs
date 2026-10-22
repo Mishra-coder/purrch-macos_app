@@ -12,7 +12,7 @@ namespace Purrch.Interface;
 /// Settings: a section list on the left, the section's rows on the right.
 public sealed class SettingsView : Grid
 {
-    public enum Section { Appearance, Behaviour, Modules, About }
+    public enum Section { Appearance, Behaviour, Modules, AI, About }
 
     /// Remembered across openings, like the Mac app's @State while the panel lives.
     private static Section _section = Section.Appearance;
@@ -59,6 +59,7 @@ public sealed class SettingsView : Grid
         Section.Appearance => "\uE790",
         Section.Behaviour => "\uE962",
         Section.Modules => "\uF0E2",
+        Section.AI => "\uE945",
         _ => "\uE946",
     };
 
@@ -85,6 +86,9 @@ public sealed class SettingsView : Grid
                 break;
             case Section.Modules:
                 BuildModules();
+                break;
+            case Section.AI:
+                BuildAi();
                 break;
             case Section.About:
                 BuildAbout();
@@ -155,6 +159,72 @@ public sealed class SettingsView : Grid
             grid.Children.Add(card);
         }
         Add(grid);
+    }
+
+    private void BuildAi()
+    {
+        Add(Heading("Model"));
+        var providers = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var provider in Enum.GetValues<AiProvider>())
+        {
+            var p = provider;
+            var pill = Ui.Pill(provider.Title(), _settings.AiProvider == provider ? "\uE73E" : "\uE945",
+                () => { _settings.AiProvider = p; Show(Section.AI); }, prominent: _settings.AiProvider == provider);
+            pill.Margin = new Thickness(0, 0, 8, 0);
+            providers.Children.Add(pill);
+        }
+        Add(providers);
+        Add(Ui.Text("The Assistant and Translate use your own API key. Keys are kept in Windows Credential Manager, " +
+                    "never in Purrch's files.", 11, ThemeResources.SecondaryText));
+        Add(Secret("Anthropic API key (Claude)", AiProvider.Claude));
+        Add(Secret("OpenAI API key", AiProvider.OpenAI));
+        Add(Secret("Gemini API key (free at aistudio.google.com/apikey)", AiProvider.Gemini));
+        Add(Toggle("Web search", "Let Claude search the web when it needs fresh information.",
+            _settings.AssistantWebSearch, v => _settings.AssistantWebSearch = v));
+    }
+
+    /// A masked key field. Saves to Credential Manager a moment after typing stops; clearing it deletes the key.
+    private static UIElement Secret(string title, AiProvider provider)
+    {
+        var box = new PasswordBox
+        {
+            Password = SecretStore.Get(provider.SecretName()),
+            BorderThickness = new Thickness(0),
+            Background = Brushes.Transparent,
+            FontSize = 13,
+            Padding = new Thickness(0),
+        };
+        box.SetResourceReference(Control.ForegroundProperty, ThemeResources.Text);
+        box.SetResourceReference(PasswordBox.CaretBrushProperty, ThemeResources.Text);
+        var saved = Ui.Text("", 11, ThemeResources.SecondaryText);
+        var save = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(0.6) };
+        save.Tick += (_, _) =>
+        {
+            save.Stop();
+            SecretStore.Set(provider.SecretName(), box.Password.Trim());
+            saved.Text = box.Password.Length == 0 ? "Removed" : "Saved";
+        };
+        box.PasswordChanged += (_, _) => { saved.Text = ""; save.Stop(); save.Start(); };
+
+        var field = new DockPanel();
+        DockPanel.SetDock(saved, Dock.Right);
+        field.Children.Add(saved);
+        field.Children.Add(box);
+        var frame = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(8, 7, 8, 7),
+            BorderThickness = new Thickness(0.6),
+            Child = field,
+            Margin = new Thickness(0, 4, 0, 0),
+        };
+        frame.SetResourceReference(Border.BackgroundProperty, ThemeResources.Surface);
+        frame.SetResourceReference(Border.BorderBrushProperty, ThemeResources.Border);
+
+        var stack = new StackPanel();
+        stack.Children.Add(Ui.Text(title, 11, ThemeResources.SecondaryText));
+        stack.Children.Add(frame);
+        return stack;
     }
 
     private void BuildAbout()

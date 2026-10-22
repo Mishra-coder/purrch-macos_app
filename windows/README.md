@@ -118,6 +118,13 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] On a laptop: battery %, Charging / Plugged in / On battery, health and time remaining look right; unplugging updates within a second or two. On a desktop or VM it says "No battery".
 - [ ] Machine shows uptime, the Windows version and the PC name.
 
+**Assistant**
+
+- [ ] Settings → AI: paste a Claude, OpenAI or Gemini key; "Saved" appears and the key shows up in Credential Manager → Windows Credentials as `Purrch:anthropic` / `openai` / `gemini`. Clearing the field removes it.
+- [ ] With no key, the Assistant says which key is missing. With a key, the suggestion chips and typed questions get answers; **bold** and `code` render, and right-click copies a reply.
+- [ ] The provider capsule switches between Claude, OpenAI and Gemini; for Claude, "Web search" lets it answer questions about recent events.
+- [ ] A wrong key gives a clear "rejected the API key" message, and no internet gives "Couldn't reach ...".
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -134,7 +141,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Clipboard history | `%APPDATA%\Purrch\clipboard.json`, images in `clipboard-images\` |
 | Notes, Scratchpad | `%APPDATA%\Purrch\notes.json`, `scratchpad.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
-| API keys (from step 7) | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
+| API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |
 
 To reset Purrch completely, quit it from the tray, delete `%APPDATA%\Purrch`, and turn off **Purrch** in Task Manager → Startup apps (or delete the Run value).

@@ -35,6 +35,9 @@ public sealed class NotchState : INotifyPropertyChanged
         }
     }
 
+    /// The window that was in front before Purrch took focus (for "the app you were in").
+    public IntPtr PreviousApp { get; set; }
+
     /// Opened from the tray or a second launch: stay open until the pointer has visited the panel once.
     public bool HoldUntilHovered { get; set; }
 

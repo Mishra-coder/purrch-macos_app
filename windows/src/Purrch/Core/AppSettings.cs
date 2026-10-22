@@ -23,6 +23,8 @@ public sealed class AppSettings : INotifyPropertyChanged
         public string LastModule { get; set; } = "home";
         public bool HasCompletedOnboarding { get; set; }
         public bool LaunchAtStartupDefaulted { get; set; }
+        public string AiProvider { get; set; } = "claude";
+        public bool AssistantWebSearch { get; set; }
     }
 
     private static readonly JsonSerializerOptions Json = new()
@@ -90,6 +92,20 @@ public sealed class AppSettings : INotifyPropertyChanged
     {
         get => _data.HasCompletedOnboarding;
         set { if (_data.HasCompletedOnboarding != value) { _data.HasCompletedOnboarding = value; Changed(); } }
+    }
+
+    /// Which model the Assistant (and, unless it picks its own, Translate) uses.
+    public AiProvider AiProvider
+    {
+        get => Enum.TryParse<AiProvider>(_data.AiProvider, ignoreCase: true, out var p) ? p : AiProvider.Claude;
+        set { if (AiProvider != value) { _data.AiProvider = value.ToString().ToLowerInvariant(); Changed(); } }
+    }
+
+    /// Lets Claude search the web when it needs fresh information.
+    public bool AssistantWebSearch
+    {
+        get => _data.AssistantWebSearch;
+        set { if (_data.AssistantWebSearch != value) { _data.AssistantWebSearch = value; Changed(); } }
     }
 
     /// Lives in the registry, not settings.json, so Task Manager's Startup tab and this toggle agree.

@@ -286,7 +286,7 @@ public partial class NotchWindow : Window
         if (_state.IsHidden) { _state.SetPeeking(false); return; }
         if (PointerInWindow() is not { } mouse) return;
         var front = Native.GetForegroundWindow();
-        if (front != _hwnd && front != IntPtr.Zero) _previousForeground = front;
+        if (front != _hwnd && front != IntPtr.Zero) _state.PreviousApp = _previousForeground = front;
         var down = Native.IsMouseButtonDown();
         var pressed = down && !_wasButtonDown;
         _wasButtonDown = down;
