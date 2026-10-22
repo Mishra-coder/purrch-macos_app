@@ -29,6 +29,8 @@ public partial class NotchWindow : Window
     private IntPtr _hwnd;
     /// Right-click menus open as popups that can reach outside the panel; keep it open meanwhile.
     private int _openMenus;
+    /// The app that was in front before Purrch took focus; it gets focus back when the panel closes.
+    private IntPtr _previousForeground;
 
     public NotchWindow()
     {
@@ -87,7 +89,11 @@ public partial class NotchWindow : Window
         {
             case nameof(NotchState.IsExpanded):
                 Render(_state.IsExpanded ? Motion.Open : Motion.Close);
-                if (!_state.IsExpanded) _state.EnsureSelectionEnabled();
+                if (!_state.IsExpanded)
+                {
+                    _state.EnsureSelectionEnabled();
+                    ReturnFocus();
+                }
                 break;
             case nameof(NotchState.IsPeeking):
                 Render(Motion.Peek);
@@ -237,6 +243,14 @@ public partial class NotchWindow : Window
         }
     }
 
+    /// After typing in a note, keys should go back to the app you were in, not to a folded-away panel.
+    private void ReturnFocus()
+    {
+        if (Native.GetForegroundWindow() != _hwnd) return;
+        if (_previousForeground != IntPtr.Zero && Native.IsWindow(_previousForeground))
+            Native.SetForegroundWindow(_previousForeground);
+    }
+
     // MARK: - Pointer
 
     private void OnBodyMouseDown(object sender, MouseButtonEventArgs e)
@@ -271,6 +285,8 @@ public partial class NotchWindow : Window
     {
         if (_state.IsHidden) { _state.SetPeeking(false); return; }
         if (PointerInWindow() is not { } mouse) return;
+        var front = Native.GetForegroundWindow();
+        if (front != _hwnd && front != IntPtr.Zero) _previousForeground = front;
         var down = Native.IsMouseButtonDown();
         var pressed = down && !_wasButtonDown;
         _wasButtonDown = down;
