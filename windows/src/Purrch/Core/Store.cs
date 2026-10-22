@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Purrch.Core;
 
@@ -10,6 +11,8 @@ public static class Store
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
+        // Enums by name, so adding a value later doesn't shift what old files mean.
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
     private static string PathFor(string name) => System.IO.Path.Combine(AppPaths.Root, name + ".json");
