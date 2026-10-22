@@ -1,0 +1,132 @@
+# Purrch for Windows
+
+A rewrite of Purrch for Windows in C#, .NET 8 and WPF. Windows laptops have no notch, so Purrch shows a small pill at the top centre of the primary screen. Hover over it and it opens into the panel; move away and it folds back.
+
+The project builds on macOS, but the app only runs on Windows 10 (1809 or later) and Windows 11.
+
+## Status
+
+| Step | What | State |
+| --- | --- | --- |
+| 1 | Pill window, expand and collapse, tab bar, settings, themes, tray icon, launch at startup | Done; not yet run on Windows |
+| 2 | Timers (Pomodoro, countdown, stopwatch) | Next |
+| 3 | Clipboard history | |
+| 4 | Notes and Scratchpad | |
+| 5 | Now Playing (Windows media session) | |
+| 6 | System (CPU, memory, disk, network, battery) | |
+| 7 | Assistant and Translate (Claude, OpenAI or Gemini, your own key) | |
+
+All 24 modules from the Mac app are in the tab bar. The ones not built yet show a "Coming soon" card.
+
+## Build on a Mac
+
+You need the .NET 8 SDK. It does not need admin rights if you install it into your home folder:
+
+```sh
+curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
+bash dotnet-install.sh --channel 8.0 --install-dir ~/.dotnet
+~/.dotnet/dotnet build windows/Purrch.sln
+```
+
+`EnableWindowsTargeting` in the project file makes the build work outside Windows. A clean build has no errors or warnings.
+
+## Run on Windows
+
+### Option A: build a Windows .exe on the Mac and copy it over
+
+```sh
+~/.dotnet/dotnet publish windows/src/Purrch -c Release -r win-x64 --self-contained \
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+  -p:EnableCompressionInSingleFile=true -o windows/publish/win-x64
+```
+
+This writes one `Purrch.exe` (about 72 MB, with .NET included) to `windows/publish/win-x64`. Use `-r win-arm64` instead for Windows on ARM, for example Windows 11 in Parallels or UTM on an Apple Silicon Mac.
+
+1. Copy `Purrch.exe` to the PC, for example into `C:\Users\<you>\Apps\Purrch\`. Keep it in that folder, because launch at startup remembers this path.
+2. Double-click it. The exe is not signed yet, so SmartScreen will say "Windows protected your PC". Click **More info**, then **Run anyway**.
+3. A black pill appears at the top centre of the screen, and the Purrch cat appears in the notification area (it may be under the **^** arrow).
+
+### Option B: build on the Windows PC
+
+```powershell
+winget install Microsoft.DotNet.SDK.8
+git clone https://github.com/Mishra-coder/purrch-macos_app.git purrch
+cd purrch\windows
+dotnet run --project src\Purrch
+```
+
+`dotnet run` makes a Debug build. Debug builds never add themselves to startup, so your startup list doesn't get a path inside `bin\Debug`.
+
+## What to test on Windows
+
+None of this has run on a real Windows machine yet. Please go through the list and report anything that is off, with a screenshot if you can, and include `%APPDATA%\Purrch\purrch.log` if something crashed.
+
+**Pill and panel**
+
+- [ ] The pill sits at the top centre of the primary screen, is crisp (not blurry), and stays above other windows.
+- [ ] Hovering the pill makes it grow slightly, and after a moment it opens into the panel with a small bounce.
+- [ ] Moving the pointer away closes it after about a third of a second. Clicking in another app closes it straight away.
+- [ ] Clicking the empty area around the pill still reaches the window underneath, for example browser tabs.
+- [ ] The pin in the header keeps the panel open. Esc closes it, even when pinned.
+- [ ] Purrch does not appear in the taskbar or in Alt+Tab.
+- [ ] Repeat at 100%, 125% and 150% display scaling, and with a second monitor. The pill should stay on the primary screen.
+
+**Tabs, settings and themes**
+
+- [ ] On first run a welcome screen appears. **Get started** brings up the tab bar.
+- [ ] All tab icons show as icons, not empty boxes. On Windows 10 they come from Segoe MDL2 Assets, on Windows 11 from Segoe Fluent Icons.
+- [ ] Icons grow under the pointer and show their name. Resting on one for a moment selects it. Dragging one sideways reorders the tabs, and the order is still the same after quitting and reopening Purrch.
+- [ ] Each of the six themes recolours the panel at once. Playful gives each module its own colour.
+- [ ] Settings → Modules: turning modules off removes them from the tab bar, and **Reset order** works. Home can't be turned off.
+- [ ] Settings → Behaviour: with **Open on hover** off, the panel only opens on click.
+
+**Tray, startup and full screen**
+
+- [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
+- [ ] Opening the exe a second time opens the panel of the copy that is already running, and doesn't start a second copy.
+- [ ] Release build: after the first run, Purrch is listed under Task Manager → Startup apps and starts again after signing out and back in. Turning **Launch at startup** off in Settings removes it, and it stays off.
+- [ ] A full-screen YouTube video (F11 or the video's full-screen button), a full-screen game and a PowerPoint slideshow all hide the pill. It comes back when they leave full screen. A normal maximised window must **not** hide it.
+
+## Where Purrch keeps things
+
+| What | Where |
+| --- | --- |
+| Settings | `%APPDATA%\Purrch\settings.json` |
+| Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
+| API keys (from step 7) | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
+| Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |
+
+To reset Purrch completely, quit it from the tray, delete `%APPDATA%\Purrch`, and turn off **Purrch** in Task Manager → Startup apps (or delete the Run value).
+
+## Project layout
+
+```
+windows/
+  Purrch.sln
+  src/Purrch/
+    App.xaml(.cs)          single instance, crash log, creates the window and tray icon
+    Core/                  settings, panel state, modules, live activities, Win32 calls,
+                           Credential Manager, startup registration
+    DesignSystem/          themes, motion curves, the pill shape, shared styles and UI helpers
+    Interface/             pill window, closed and open views, tab bar, settings, welcome, tray icon
+    Assets/                app icon, tray icon, mascot
+```
+
+How it maps to the Mac app:
+
+| Mac (`Sources/Purrch`) | Windows (`windows/src/Purrch`) |
+| --- | --- |
+| `NotchWindowController` | `Interface/NotchWindow` |
+| `NotchState`, `Motion` | `Core/NotchState`, `DesignSystem/Motion` |
+| `AppSettings` (UserDefaults and keychain) | `Core/AppSettings` (JSON) and `Core/SecretStore` (Credential Manager) |
+| `Theme`, `NotchShape` | `DesignSystem/Theme`, `DesignSystem/NotchSurface` |
+| `RootView`, `CollapsedView`, `TabBar`, `SettingsView` | the views with the same names in `Interface/` |
+| SF Symbols | Segoe Fluent Icons / Segoe MDL2 Assets glyphs (`ModuleInfo.Glyph`) |
+| MacMate AI | Assistant |
+
+## Known limitations
+
+- The pill always sits on the primary screen.
+- Clicking inside the open panel makes Purrch the active window, so the app you were in loses keyboard focus until you click back into it.
+- Live activities are wired into the closed pill, but nothing feeds them yet. Timers (step 2), Now Playing (step 5) and Downloads add them.
+- The exe is not code-signed, so SmartScreen warns on first run.
