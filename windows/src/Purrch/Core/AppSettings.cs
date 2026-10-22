@@ -22,6 +22,7 @@ public sealed class AppSettings : INotifyPropertyChanged
         public List<string> ModuleOrder { get; set; } = new();
         public string LastModule { get; set; } = "home";
         public bool HasCompletedOnboarding { get; set; }
+        public bool LaunchAtStartupDefaulted { get; set; }
     }
 
     private static readonly JsonSerializerOptions Json = new()
@@ -89,6 +90,37 @@ public sealed class AppSettings : INotifyPropertyChanged
     {
         get => _data.HasCompletedOnboarding;
         set { if (_data.HasCompletedOnboarding != value) { _data.HasCompletedOnboarding = value; Changed(); } }
+    }
+
+    /// Lives in the registry, not settings.json, so Task Manager's Startup tab and this toggle agree.
+    public bool LaunchAtStartup
+    {
+        get => StartupRegistration.IsEnabled;
+        set
+        {
+            if (LaunchAtStartup == value) return;
+            StartupRegistration.Set(value);
+            OnPropertyChanged(nameof(LaunchAtStartup));
+        }
+    }
+
+    /// Once opened, Purrch should keep coming back after a restart, like other tray apps.
+    /// Only the first launch turns it on, so switching it off later sticks.
+    public void ApplyStartupDefault()
+    {
+#if DEBUG
+        // Development builds run from bin\Debug; don't put that path in the Run key.
+        return;
+#else
+        if (_data.LaunchAtStartupDefaulted)
+        {
+            StartupRegistration.RefreshPath();
+            return;
+        }
+        _data.LaunchAtStartupDefaulted = true;
+        Save();
+        LaunchAtStartup = true;
+#endif
     }
 
     /// Tab-bar order. Always contains every module once.

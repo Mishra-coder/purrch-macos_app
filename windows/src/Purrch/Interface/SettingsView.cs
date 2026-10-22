@@ -80,6 +80,8 @@ public sealed class SettingsView : Grid
                     _settings.HideInFullscreen, v => _settings.HideInFullscreen = v));
                 Add(Toggle("Live activities", "Music, timers and downloads in the closed pill.",
                     _settings.ShowLiveActivities, v => _settings.ShowLiveActivities = v));
+                Add(Toggle("Launch at startup", "Start Purrch automatically when you sign in to Windows.",
+                    _settings.LaunchAtStartup, v => _settings.LaunchAtStartup = v));
                 break;
             case Section.Modules:
                 BuildModules();

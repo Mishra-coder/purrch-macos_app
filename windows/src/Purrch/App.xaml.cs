@@ -13,6 +13,7 @@ public partial class App : Application
 
     private Mutex? _instanceMutex;
     private EventWaitHandle? _openEvent;
+    private TrayIcon? _tray;
 
     /// Raised on the UI thread when Purrch is launched a second time.
     public event Action? OpenRequested;
@@ -40,11 +41,14 @@ public partial class App : Application
         var theme = AppSettings.Shared.Theme;
         ThemeResources.Apply(theme, theme.Accent);
         new NotchWindow().Show();
+        _tray = new TrayIcon();
         OpenRequested += () => NotchState.Shared.Present();
+        AppSettings.Shared.ApplyStartupDefault();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _tray?.Dispose();
         _openEvent?.Dispose();
         _instanceMutex?.Dispose();
         base.OnExit(e);
