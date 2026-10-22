@@ -9,8 +9,8 @@ The project builds on macOS, but the app only runs on Windows 10 (1809 or later)
 | Step | What | State |
 | --- | --- | --- |
 | 1 | Pill window, expand and collapse, tab bar, settings, themes, tray icon, launch at startup | Done; not yet run on Windows |
-| 2 | Timers (Pomodoro, countdown, stopwatch) | Next |
-| 3 | Clipboard history | |
+| 2 | Timers (Pomodoro, countdown, stopwatch, water reminder) | Done; not yet run on Windows |
+| 3 | Clipboard history | Next |
 | 4 | Notes and Scratchpad | |
 | 5 | Now Playing (Windows media session) | |
 | 6 | System (CPU, memory, disk, network, battery) | |
@@ -80,6 +80,14 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Settings → Modules: turning modules off removes them from the tab bar, and **Reset order** works. Home can't be turned off.
 - [ ] Settings → Behaviour: with **Open on hover** off, the panel only opens on click.
 
+**Timers**
+
+- [ ] Pomodoro: start, pause, reset and skip work, and the ring empties as time passes. The arrows change the focus and break minutes.
+- [ ] Timer: the 5m, 10m and 25m chips start a countdown, and minus and plus change the custom length. When it ends, a chime plays, a Windows notification appears and the panel opens on Timers.
+- [ ] While a pomodoro or countdown runs, the closed pill shows the time on the right and an icon on the left, with a soft glow.
+- [ ] Stopwatch: start, lap, pause and reset. Laps are listed newest first.
+- [ ] Water: tapping drops fills them, and the count is still the same after restarting Purrch. With the switch on, a reminder notification comes every 30 minutes.
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -92,6 +100,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | What | Where |
 | --- | --- |
 | Settings | `%APPDATA%\Purrch\settings.json` |
+| Timer lengths, pomodoros done, water | `%APPDATA%\Purrch\timers.json`, `water.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys (from step 7) | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |
@@ -128,5 +137,5 @@ How it maps to the Mac app:
 
 - The pill always sits on the primary screen.
 - Clicking inside the open panel makes Purrch the active window, so the app you were in loses keyboard focus until you click back into it.
-- Live activities are wired into the closed pill, but nothing feeds them yet. Timers (step 2), Now Playing (step 5) and Downloads add them.
+- The closed pill shows running timers. Music and downloads come with Now Playing (step 5) and Downloads.
 - The exe is not code-signed, so SmartScreen warns on first run.

@@ -9,8 +9,12 @@ public sealed class TrayIcon : IDisposable
 {
     private readonly Forms.NotifyIcon _icon;
 
+    /// The one tray icon, once the app has created it.
+    public static TrayIcon? Current { get; private set; }
+
     public TrayIcon()
     {
+        Current = this;
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Open Purrch", null, (_, _) => NotchState.Shared.Present());
         menu.Items.Add("Settings", null, (_, _) => NotchState.Shared.Present(settings: true));
@@ -37,8 +41,13 @@ public sealed class TrayIcon : IDisposable
         return new System.Drawing.Icon(stream, Forms.SystemInformation.SmallIconSize);
     }
 
+    /// A Windows notification from the tray icon (shown as a toast on Windows 10 and 11).
+    public void Notify(string title, string body) =>
+        _icon.ShowBalloonTip(5000, title, body, Forms.ToolTipIcon.None);
+
     public void Dispose()
     {
+        Current = null;
         // Without this the icon lingers in the tray until the pointer passes over it.
         _icon.Visible = false;
         _icon.Dispose();

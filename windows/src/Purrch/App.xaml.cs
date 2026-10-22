@@ -42,6 +42,7 @@ public partial class App : Application
         ThemeResources.Apply(theme, theme.Accent);
         new NotchWindow().Show();
         _tray = new TrayIcon();
+        BackgroundServices.Start();
         OpenRequested += () => NotchState.Shared.Present();
         AppSettings.Shared.ApplyStartupDefault();
     }

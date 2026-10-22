@@ -84,6 +84,10 @@ public static class ThemeResources
     public const string ThemeAccent = "Purrch.ThemeAccent";
     /// Faint text-coloured fill for controls that sit on a surface.
     public const string Hairline = "Purrch.Hairline";
+    /// Text colour at 10%: round buttons, ring tracks, unlit bars.
+    public const string Fill = "Purrch.Fill";
+    /// Accent at 16%, for the icon badge on cards.
+    public const string AccentFaint = "Purrch.AccentFaint";
 
     public static void Apply(Theme theme, Color accent)
     {
@@ -97,5 +101,7 @@ public static class ThemeResources
         r[AccentSoft] = accent.WithOpacity(theme.Glow ? 0.9 : 0.2).Brush();
         r[ThemeAccent] = theme.Accent.Brush();
         r[Hairline] = theme.Text.WithOpacity(0.08).Brush();
+        r[Fill] = theme.Text.WithOpacity(0.1).Brush();
+        r[AccentFaint] = accent.WithOpacity(0.16).Brush();
     }
 }

@@ -55,6 +55,41 @@ public static class Ui
         return button;
     }
 
+    /// Round icon button. Prominent ones are filled with the accent.
+    public static Button IconButton(string glyph, double size, Action onClick, bool prominent = false, string? tooltip = null)
+    {
+        var circle = new Border
+        {
+            Width = size,
+            Height = size,
+            CornerRadius = new CornerRadius(size / 2),
+            Child = Glyph(glyph, size * 0.4, prominent ? ThemeResources.Background : ThemeResources.Text),
+        };
+        circle.SetResourceReference(Border.BackgroundProperty, prominent ? ThemeResources.Accent : ThemeResources.Fill);
+        var button = new Button
+        {
+            Content = circle,
+            Style = (Style)Application.Current.FindResource("Purrch.PlainButton"),
+            ToolTip = tooltip,
+        };
+        button.Click += (_, _) => onClick();
+        return button;
+    }
+
+    /// A bare glyph or label that acts as a button (steppers, plus and minus).
+    public static Button Bare(UIElement content, Action onClick, string? tooltip = null)
+    {
+        var button = new Button
+        {
+            Content = content,
+            Style = (Style)Application.Current.FindResource("Purrch.PlainButton"),
+            ToolTip = tooltip,
+            Background = Brushes.Transparent,
+        };
+        button.Click += (_, _) => onClick();
+        return button;
+    }
+
     public static ToggleButton Switch(bool isOn, Action<bool> changed, bool enabled = true)
     {
         var toggle = new ToggleButton

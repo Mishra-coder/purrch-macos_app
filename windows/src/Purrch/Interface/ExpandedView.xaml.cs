@@ -163,7 +163,11 @@ public partial class ExpandedView : UserControl
     {
         if (!_settings.HasCompletedOnboarding) return new OnboardingView();
         if (_state.ShowSettings) return new SettingsView();
-        return new ModulePlaceholder(_state.Selected, _settings.Theme.Glow);
+        return _state.Selected switch
+        {
+            ModuleId.Timers => new Features.Timers.TimersModule(),
+            _ => new ModulePlaceholder(_state.Selected, _settings.Theme.Glow),
+        };
     }
 
     internal static System.Windows.Media.Effects.DropShadowEffect Glow(Color color, double radius) => new()
