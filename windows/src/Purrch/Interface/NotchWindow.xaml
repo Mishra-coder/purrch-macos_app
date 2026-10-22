@@ -1,0 +1,34 @@
+<Window x:Class="Purrch.Interface.NotchWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ds="clr-namespace:Purrch.DesignSystem"
+        xmlns:ui="clr-namespace:Purrch.Interface"
+        Title="Purrch"
+        Width="880" Height="480"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" Topmost="True" ShowInTaskbar="False" ShowActivated="False"
+        FontFamily="{StaticResource Purrch.Font}" UseLayoutRounding="True">
+    <!-- Fully transparent pixels let clicks through, so only the pill itself is clickable. -->
+    <Grid>
+        <Grid x:Name="Body" HorizontalAlignment="Center" VerticalAlignment="Top" Width="210" Height="30">
+            <Grid x:Name="GlowHost">
+                <Grid.Effect>
+                    <DropShadowEffect x:Name="Glow" ShadowDepth="0" BlurRadius="26" Opacity="0" />
+                </Grid.Effect>
+                <ds:NotchSurface x:Name="Surface">
+                    <ds:NotchSurface.Effect>
+                        <DropShadowEffect x:Name="Shadow" Color="Black" Direction="270" ShadowDepth="10"
+                                          BlurRadius="48" Opacity="0" />
+                    </ds:NotchSurface.Effect>
+                </ds:NotchSurface>
+            </Grid>
+            <!-- Content sits between the top flares and is clipped to the growing body. -->
+            <Grid x:Name="ContentClip" Margin="10,0,10,0" ClipToBounds="True">
+                <ui:CollapsedView x:Name="Collapsed" />
+                <ui:ExpandedView x:Name="Expanded" Width="780" Height="420"
+                                 HorizontalAlignment="Center" VerticalAlignment="Top"
+                                 Opacity="0" Visibility="Collapsed" />
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

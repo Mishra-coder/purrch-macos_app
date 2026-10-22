@@ -1,0 +1,65 @@
+<UserControl x:Class="Purrch.Interface.ExpandedView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header: what is on screen, plus pin and settings. -->
+        <Grid x:Name="Header" Margin="18,6,14,0">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="HeaderShift" />
+            </Grid.RenderTransform>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Border x:Name="Badge" Width="26" Height="26" CornerRadius="8" VerticalAlignment="Center"
+                    Background="{DynamicResource Purrch.AccentSoft}">
+                <TextBlock x:Name="BadgeGlyph" Style="{StaticResource Purrch.Glyph}" FontSize="12" />
+            </Border>
+
+            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                <TextBlock x:Name="TitleText" FontSize="13.5" FontWeight="Bold"
+                           Foreground="{DynamicResource Purrch.Text}" />
+                <TextBlock x:Name="SubtitleText" FontSize="10.5" MaxWidth="360" HorizontalAlignment="Left"
+                           TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Purrch.SecondaryText}" />
+            </StackPanel>
+
+            <!-- Pin and settings, grouped in one capsule. -->
+            <Border Grid.Column="2" CornerRadius="14" Padding="2" VerticalAlignment="Center"
+                    Background="{DynamicResource Purrch.Hairline}"
+                    BorderBrush="{DynamicResource Purrch.Hairline}" BorderThickness="0.6">
+                <StackPanel x:Name="Controls" Orientation="Horizontal">
+                    <Button x:Name="PinButton" Style="{StaticResource Purrch.PlainButton}" Click="OnPinClick">
+                        <Border x:Name="PinPill" MinWidth="26" Height="24" CornerRadius="12" Padding="0">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock x:Name="PinGlyph" Style="{StaticResource Purrch.Glyph}" FontSize="11" Text="&#xE718;" />
+                                <TextBlock x:Name="PinLabel" Text="Pinned" Margin="5,0,0,0" FontSize="11"
+                                           FontWeight="SemiBold" VerticalAlignment="Center" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Border>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- The selected module (or settings). Old content slides out while new content slides in. -->
+        <Grid x:Name="ContentArea" Grid.Row="1" Margin="16,6,16,10" RenderTransformOrigin="0.5,0">
+            <Grid.RenderTransform>
+                <ScaleTransform x:Name="ContentScale" />
+            </Grid.RenderTransform>
+        </Grid>
+
+        <Grid x:Name="TabBarArea" Grid.Row="2" Margin="12,0,12,12">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="TabBarShift" />
+            </Grid.RenderTransform>
+        </Grid>
+    </Grid>
+</UserControl>

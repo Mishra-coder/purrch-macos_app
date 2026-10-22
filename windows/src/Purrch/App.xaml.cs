@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Threading;
 using Purrch.Core;
+using Purrch.DesignSystem;
+using Purrch.Interface;
 
 namespace Purrch;
 
@@ -34,6 +36,11 @@ public partial class App : Application
         DispatcherUnhandledException += OnUnhandledException;
         base.OnStartup(e);
         Log.Write("Purrch started");
+
+        var theme = AppSettings.Shared.Theme;
+        ThemeResources.Apply(theme, theme.Accent);
+        new NotchWindow().Show();
+        OpenRequested += () => NotchState.Shared.Present();
     }
 
     protected override void OnExit(ExitEventArgs e)
