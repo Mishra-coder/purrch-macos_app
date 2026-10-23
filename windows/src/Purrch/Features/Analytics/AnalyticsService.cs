@@ -37,13 +37,13 @@ public sealed class AnalyticsSnapshot
 /// in analytics.json.
 public sealed class AnalyticsService
 {
-    public static AnalyticsService Shared { get; } = new();
-
     /// Credential Manager entry for the key ("Purrch:plausible").
     public const string SecretName = "plausible";
 
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(30);
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
+
+    public static AnalyticsService Shared { get; } = new();
 
     private readonly DispatcherTimer _timer = new() { Interval = RefreshInterval };
     private int _users;

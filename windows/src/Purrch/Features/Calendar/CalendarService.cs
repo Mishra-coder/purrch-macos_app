@@ -43,14 +43,14 @@ public sealed class LocalReminder
 /// %APPDATA%\Purrch\calendar-cache, so the agenda still shows offline.
 public sealed class CalendarService
 {
-    public static CalendarService Shared { get; } = new();
-
     private static readonly TimeSpan Stale = TimeSpan.FromMinutes(15);
     private static readonly HttpClient Http = CreateClient();
     private static readonly string CacheFolder = System.IO.Path.Combine(AppPaths.Root, "calendar-cache");
 
     /// macOS calendar colours, handed out in turn to new calendars.
     private static readonly string[] Palette = { "#0A84FF", "#30D158", "#FF9F0A", "#BF5AF2", "#FF453A", "#FFD60A", "#64D2FF", "#AC8E68" };
+
+    public static CalendarService Shared { get; } = new();
 
     private sealed class Data
     {

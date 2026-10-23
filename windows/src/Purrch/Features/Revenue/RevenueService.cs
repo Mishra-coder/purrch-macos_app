@@ -33,8 +33,6 @@ public sealed class RevenueSnapshot
 /// Refreshes every minute while a view shows it; the last result is kept in revenue.json.
 public sealed class RevenueService
 {
-    public static RevenueService Shared { get; } = new();
-
     /// Credential Manager entry for the key ("Purrch:stripe").
     public const string SecretName = "stripe";
 
@@ -47,6 +45,8 @@ public sealed class RevenueService
         "bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga",
         "pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf",
     };
+
+    public static RevenueService Shared { get; } = new();
 
     private readonly DispatcherTimer _timer = new() { Interval = RefreshInterval };
     private int _users;

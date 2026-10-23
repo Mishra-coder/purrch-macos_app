@@ -71,11 +71,11 @@ public static class WeatherCode
 /// Refreshes every 20 minutes while a view shows it; the last forecast is kept in weather.json.
 public sealed class WeatherService
 {
-    public static WeatherService Shared { get; } = new();
-
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(20);
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
+
+    public static WeatherService Shared { get; } = new();
 
     private readonly DispatcherTimer _timer = new() { Interval = RefreshInterval };
     private int _users;

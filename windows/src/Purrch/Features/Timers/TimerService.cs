@@ -25,10 +25,10 @@ public static class PomodoroPhaseInfo
 /// running (and show in the closed pill) while the panel is shut.
 public sealed class TimerService
 {
-    public static TimerService Shared { get; } = new();
-
     private const string WaterReminderTitle = "Drink some water";
     private static readonly TimeSpan WaterInterval = TimeSpan.FromMinutes(30);
+
+    public static TimerService Shared { get; } = new();
 
     /// Something other than the passing of time changed: what is running, settings, laps, water.
     public event Action? StateChanged;

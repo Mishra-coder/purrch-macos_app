@@ -9,8 +9,6 @@ namespace Purrch.Core;
 /// User preferences, saved as JSON in %APPDATA%\Purrch\settings.json. Secrets never go here.
 public sealed class AppSettings : INotifyPropertyChanged
 {
-    public static AppSettings Shared { get; } = Load();
-
     /// What is written to disk. Enums are stored by name so the file stays readable and survives reordering.
     private sealed class Data
     {
@@ -37,6 +35,9 @@ public sealed class AppSettings : INotifyPropertyChanged
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
     };
+
+    // Declared after Json: static fields are set in the order they are written, and Load reads with Json.
+    public static AppSettings Shared { get; } = Load();
 
     private readonly Data _data;
     private ThemeId _theme;
