@@ -203,6 +203,16 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] The bin, or **Select** then **Delete**, moves files to the Recycle Bin after a few seconds; **Undo** in that time keeps them. Quitting Purrch during those seconds still recycles them.
 - [ ] With a timer running, the pill shows the timer instead of the download; with music playing, the download wins.
 
+**Calendar**
+
+- [ ] With no calendars, the left card says "No calendars connected". **Add calendar** opens the Calendars card over the dimmed module.
+- [ ] Paste a Google Calendar "Secret address in iCal format" link and press Enter: it appears in the list with a colour dot and, after a moment, the calendar's own name. A `webcal://` link (iCloud public calendar) works too; a normal web page link says "This link isn't an iCal calendar".
+- [ ] **Open .ics file…** picks a file exported from Outlook or another app; the panel stays open while the file dialog is up.
+- [ ] "Next 7 days" lists events grouped under TODAY (in the accent colour), TOMORROW and then "FRIDAY, 24 OCT", with a coloured bar per calendar, "All day" or "9:00 – 9:30", and a pin icon whose tooltip shows the location. Times match Google/Outlook, including a weekly meeting, a moved or cancelled single occurrence, and an event in another time zone.
+- [ ] Turn off Wi-Fi and reopen Purrch: the agenda still shows the last copy, and the Calendars card says "Offline: showing the last copy".
+- [ ] Reminders: typing in "Add a reminder" and pressing Enter adds one. Clicking its ring fills it, strikes the title through and the row goes. To-dos in an .ics file (VTODO) show with their due time, red once overdue.
+- [ ] Removing a calendar (bin icon) removes its events at once. Everything is still there after quitting and reopening Purrch.
+
 **Weather**
 
 - [ ] With location on (Windows Settings → Privacy & security → Location, including "Let desktop apps access your location"), Weather shows your town, the current temperature with a colour icon, the condition, H and L, and Feels, Wind and Humid along the bottom. Windows 11 may ask first whether Purrch can use your location.
@@ -236,6 +246,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | File Converter format, max size and quality | `%APPDATA%\Purrch\converter.json` |
 | Converted images | Next to the originals, as `name-converted.ext` |
 | Downloads | Nothing stored; it reads your Downloads folder. Deleted files go to the Recycle Bin |
+| Calendar links and files, reminders added in Purrch, feed to-dos ticked off | `%APPDATA%\Purrch\calendar.json`, last download of each link in `calendar-cache\` |
 | Last weather forecast (city and °F are in `settings.json`) | `%APPDATA%\Purrch\weather.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
@@ -277,3 +288,4 @@ How it maps to the Mac app:
 - Chrome, Edge and Firefox don't write the expected size of a download next to the file, so download progress is estimated (as it is for Chrome on the Mac) and the percentage shows as "…".
 - Dragging files onto the closed pill opens the Shelf. To drop images on the File Converter, pin the panel first: pressing the mouse in File Explorer to start the drag closes an unpinned panel.
 - The exe is not code-signed, so SmartScreen warns on first run.
+- Calendar reads iCal links and .ics files, so it shows events but can't change them, and a published link can lag Google or Outlook by a few hours. Windows' own calendar store needs a packaged (MSIX) app.
