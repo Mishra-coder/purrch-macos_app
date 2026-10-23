@@ -1,3 +1,5 @@
+using System.IO;
+using Microsoft.Win32;
 using Purrch.Core;
 using Purrch.Features.Insights;
 
@@ -87,10 +89,33 @@ public sealed class AssistantService
 
             Live context about this PC:
             - Windows: {SystemFormat.WindowsVersion()}
+            - Model: {HardwareModel()}
             - Memory: {SystemFormat.Gb(monitor.MemoryUsed)} used of {SystemFormat.Gb(monitor.MemoryTotal)}
             - Free disk: {Format.Bytes(monitor.DiskFree)} on {monitor.DiskName}
             - Battery: {battery}
             - App in front: {front}
             """;
+    }
+
+    /// Placeholders some boards leave in the BIOS instead of a real name.
+    private static readonly string[] OemPlaceholders =
+        { "System manufacturer", "System Product Name", "To Be Filled By O.E.M.", "Default string", "Not Applicable" };
+
+    /// Maker and model from the BIOS ("Dell Inc. XPS 13 9310"), like hw.model on the Mac.
+    private static string HardwareModel()
+    {
+        try
+        {
+            using var bios = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS");
+            var parts = new[] { "SystemManufacturer", "SystemProductName" }
+                .Select(name => (bios?.GetValue(name) as string)?.Trim() ?? "")
+                .Where(part => part.Length > 0 && !OemPlaceholders.Contains(part, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+            return parts.Count == 0 ? "unknown PC" : string.Join(" ", parts);
+        }
+        catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            return "unknown PC";
+        }
     }
 }

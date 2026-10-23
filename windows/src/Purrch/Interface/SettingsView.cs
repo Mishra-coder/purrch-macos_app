@@ -20,6 +20,9 @@ public sealed class SettingsView : Grid
     private readonly AppSettings _settings = AppSettings.Shared;
     private readonly StackPanel _nav = new();
     private readonly StackPanel _content = new();
+    /// The Local server's status on the AI page.
+    private TextBlock? _localStatus;
+    private int _localCheck;
 
     public SettingsView()
     {
@@ -60,6 +63,9 @@ public sealed class SettingsView : Grid
     private void OnSettingsChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(AppSettings.ModuleOrder) && _section == Section.Modules) Show(Section.Modules);
+        // Rebuilding the page would take focus from the field being typed in; only the status line changes.
+        if (e.PropertyName is nameof(AppSettings.LocalEndpoint) or nameof(AppSettings.LocalModel) && _section == Section.AI)
+            RefreshLocalStatus();
     }
 
     private static string Glyph(Section s) => s switch
@@ -180,23 +186,42 @@ public sealed class SettingsView : Grid
     private void BuildAi()
     {
         Add(Heading("Model"));
-        var providers = new StackPanel { Orientation = Orientation.Horizontal };
+        var providers = new WrapPanel();
         foreach (var provider in Enum.GetValues<AiProvider>())
         {
             var p = provider;
             var pill = Ui.Pill(provider.Title(), _settings.AiProvider == provider ? "\uE73E" : "\uE945",
                 () => { _settings.AiProvider = p; Show(Section.AI); }, prominent: _settings.AiProvider == provider);
-            pill.Margin = new Thickness(0, 0, 8, 0);
+            pill.Margin = new Thickness(0, 0, 8, 6);
             providers.Children.Add(pill);
         }
+        providers.Margin = new Thickness(0, 0, 0, 8);
         Add(providers);
-        Add(Ui.Text("The Assistant and Translate use your own API key. Keys are kept in Windows Credential Manager, " +
-                    "never in Purrch's files.", 11, ThemeResources.SecondaryText));
+        Add(Ui.Text("Claude, OpenAI and Gemini use your own API key, kept in Windows Credential Manager, never in " +
+                    "Purrch's files. Local runs a model on this PC with Ollama or Foundry Local and needs no key.",
+                    11, ThemeResources.SecondaryText));
         Add(Secret("Anthropic API key (Claude)", AiProvider.Claude.SecretName()));
         Add(Secret("OpenAI API key", AiProvider.OpenAI.SecretName()));
         Add(Secret("Gemini API key (free at aistudio.google.com/apikey)", AiProvider.Gemini.SecretName()));
         Add(Toggle("Web search", "Let Claude search the web when it needs fresh information.",
             _settings.AssistantWebSearch, v => _settings.AssistantWebSearch = v));
+
+        Add(Heading("Local (on-device)"));
+        Add(Plain("Endpoint (Ollama, or Foundry Local's address)", _settings.LocalEndpoint, v => _settings.LocalEndpoint = v));
+        Add(Plain("Model (blank = the first one installed, else llama3.2)", _settings.LocalModel, v => _settings.LocalModel = v));
+        _localStatus = Ui.Text("Checking for Ollama\u2026", 11, ThemeResources.SecondaryText);
+        Add(_localStatus);
+        RefreshLocalStatus();
+    }
+
+    /// Asks the local server what it has and shows the answer under the Local fields.
+    private async void RefreshLocalStatus()
+    {
+        var check = ++_localCheck;
+        var status = await LocalAi.ProbeAsync();
+        // The page may have moved on, or a newer check started, while this one waited.
+        if (check != _localCheck || _localStatus == null || _section != Section.AI) return;
+        _localStatus.Text = LocalAi.Describe(status);
     }
 
     private void BuildIntegrations()

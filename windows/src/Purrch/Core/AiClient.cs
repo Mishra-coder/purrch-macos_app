@@ -9,7 +9,8 @@ using Anthropic.Models.Beta.Messages;
 
 namespace Purrch.Core;
 
-public enum AiProvider { Claude, OpenAI, Gemini }
+/// Local is a model running on this PC (Ollama or Foundry Local), the Windows stand-in for the Mac's Apple on-device model.
+public enum AiProvider { Claude, OpenAI, Gemini, Local }
 
 public static class AiProviderInfo
 {
@@ -17,18 +18,26 @@ public static class AiProviderInfo
     {
         AiProvider.OpenAI => "OpenAI",
         AiProvider.Gemini => "Gemini",
+        AiProvider.Local => "Local (on-device)",
         _ => "Claude",
     };
 
-    /// Credential Manager entry for the provider's key.
+    /// For tight capsules: "Local" rather than "Local (on-device)".
+    public static string ShortTitle(this AiProvider p) => p == AiProvider.Local ? "Local" : p.Title();
+
+    /// Credential Manager entry for the provider's key. Local has none.
     public static string SecretName(this AiProvider p) => p switch
     {
         AiProvider.OpenAI => "openai",
         AiProvider.Gemini => "gemini",
+        AiProvider.Local => "",
         _ => "anthropic",
     };
 
-    public static bool HasKey(this AiProvider p) => SecretStore.Get(p.SecretName()).Length > 0;
+    public static bool NeedsKey(this AiProvider p) => p != AiProvider.Local;
+
+    /// True when the provider can be asked: its key is saved, or it needs none (Local).
+    public static bool HasKey(this AiProvider p) => !p.NeedsKey() || SecretStore.Get(p.SecretName()).Length > 0;
 }
 
 /// One turn of a conversation.
@@ -37,7 +46,8 @@ public sealed record ChatTurn(bool FromUser, string Text);
 /// A failure worth showing to the user as is ("Your Claude key was rejected").
 public sealed class AiException(string message) : Exception(message);
 
-/// Sends a prompt (with optional history) to Claude, OpenAI or Gemini using the user's own key.
+/// Sends a prompt (with optional history) to Claude, OpenAI or Gemini using the user's own key,
+/// or to a local model through its OpenAI-compatible endpoint.
 public static class AiClient
 {
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(5) };
@@ -45,12 +55,14 @@ public static class AiClient
     public static async Task<string> CompleteAsync(AiProvider provider, string system, IReadOnlyList<ChatTurn> history,
                                                    string prompt, bool webSearch, CancellationToken cancel)
     {
+        var turns = Alternating(history, prompt);
+        if (provider == AiProvider.Local) return await AskLocal(system, turns, cancel);
         var key = SecretStore.Get(provider.SecretName());
         if (key.Length == 0) throw new AiException($"{provider.Title()} needs an API key. Add it in Settings → AI.");
-        var turns = Alternating(history, prompt);
         return provider switch
         {
-            AiProvider.OpenAI => await AskOpenAI(key, system, turns, cancel),
+            AiProvider.OpenAI => await AskChat("https://api.openai.com/v1/chat/completions", key, "gpt-4o-mini", "OpenAI",
+                                               system, turns, cancel),
             AiProvider.Gemini => await AskGemini(key, system, turns, cancel),
             _ => await AskClaude(key, system, turns, webSearch, cancel),
         };
@@ -62,7 +74,10 @@ public static class AiClient
                                                 CancellationToken cancel)
     {
         var client = new AnthropicClient { ApiKey = key };
-        var parameters = new MessageCreateParams
+        var messages = turns.Select(t => t.FromUser
+            ? (BetaMessageParam)new BetaUserMessageParam { Content = t.Text }
+            : new BetaAssistantMessageParam { Content = t.Text }).ToList();
+        MessageCreateParams Parameters() => new()
         {
             Model = "claude-opus-5-5",
             MaxTokens = 16000,
@@ -72,16 +87,36 @@ public static class AiClient
             // If a safety check declines a request, let the API retry it on a suitable fallback model.
             Betas = ["server-side-fallback-2026-07-01"],
             Fallbacks = new Default(),
-            Messages = turns.Select(t => t.FromUser
-                ? (BetaMessageParam)new BetaUserMessageParam { Content = t.Text }
-                : new BetaAssistantMessageParam { Content = t.Text }).ToList(),
+            Messages = messages.ToList(),
             Tools = webSearch ? [new BetaWebSearchTool20260209 { MaxUses = 3 }] : null,
         };
 
-        BetaMessage response;
+        var text = "";
+        // A long web search can pause the turn; sending the partial answer back lets Claude carry on from there.
+        for (var round = 0; round < 4; round++)
+        {
+            var response = await CreateClaude(client, Parameters(), cancel);
+            text += string.Concat(response.Content.Select(b => b.TryPickText(out var t) ? t.Text : ""));
+            if (response.StopReason == "refusal")
+                return text.Length == 0 ? "Claude declined this request. Try rephrasing it." : text + "\n\nClaude declined to continue this request.";
+            if (response.StopReason != "pause_turn") return text;
+            messages.Add(new BetaAssistantMessageParam { Content = AsParams(response.Content) });
+        }
+        return text;
+    }
+
+    /// The SDK has no response-to-request conversion; its JSON converters turn each block (thinking,
+    /// server tool use, search results) into the matching param.
+    private static List<BetaContentBlockParam> AsParams(IReadOnlyList<BetaContentBlock> content) =>
+        JsonSerializer.Deserialize<List<BetaContentBlockParam>>(JsonSerializer.Serialize(content))
+        ?? throw new AiException("Unexpected reply from Claude.");
+
+    private static async Task<BetaMessage> CreateClaude(AnthropicClient client, MessageCreateParams parameters,
+                                                       CancellationToken cancel)
+    {
         try
         {
-            response = await client.Beta.Messages.Create(parameters, cancel);
+            return await client.Beta.Messages.Create(parameters, cancel);
         }
         catch (AnthropicUnauthorizedException)
         {
@@ -107,29 +142,35 @@ public static class AiClient
         {
             throw new AiException("Couldn't reach Claude. Check your internet connection.");
         }
-
-        var text = string.Concat(response.Content.Select(b => b.TryPickText(out var t) ? t.Text : ""));
-        if (response.StopReason == "refusal")
-            return text.Length == 0 ? "Claude declined this request. Try rephrasing it." : text + "\n\nClaude declined to continue this request.";
-        if (response.StopReason == "pause_turn" && text.Length == 0)
-            return "Claude is still searching. Ask again to continue.";
-        return text;
     }
 
-    // MARK: - OpenAI
+    // MARK: - OpenAI and Local
 
-    private static async Task<string> AskOpenAI(string key, string system, IReadOnlyList<ChatTurn> turns, CancellationToken cancel)
+    /// OpenAI's chat completions, which Ollama and Foundry Local speak too. Local servers take no key.
+    private static async Task<string> AskChat(string url, string? key, string model, string name, string system,
+                                              IReadOnlyList<ChatTurn> turns, CancellationToken cancel, bool local = false)
     {
         var messages = new JsonArray { new JsonObject { ["role"] = "system", ["content"] = system } };
         foreach (var t in turns) messages.Add(new JsonObject { ["role"] = t.FromUser ? "user" : "assistant", ["content"] = t.Text });
-        var body = new JsonObject { ["model"] = "gpt-4o-mini", ["messages"] = messages };
+        var body = new JsonObject { ["model"] = model, ["messages"] = messages };
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+        using var request = new HttpRequestMessage(HttpMethod.Post, url);
+        if (key != null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
         request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
-        var json = await Send(request, "OpenAI", cancel);
+        var json = await Send(request, name, cancel, local ? model : null);
         return json["choices"]?[0]?["message"]?["content"]?.GetValue<string>()
-               ?? throw new AiException("Unexpected reply from OpenAI.");
+               ?? throw new AiException($"Unexpected reply from {name}.");
+    }
+
+    private static async Task<string> AskLocal(string system, IReadOnlyList<ChatTurn> turns, CancellationToken cancel)
+    {
+        var endpoint = LocalAi.Endpoint;
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out _))
+            throw new AiException("The local endpoint in Settings → AI isn't a valid address.");
+        var model = AppSettings.Shared.LocalModel.Trim();
+        // No model picked: use the first one the server has, as the status line in Settings says.
+        if (model.Length == 0) model = (await LocalAi.ProbeAsync(cancel)).Models.FirstOrDefault() ?? LocalAi.DefaultModel;
+        return await AskChat($"{endpoint}/v1/chat/completions", null, model, "The local model", system, turns, cancel, local: true);
     }
 
     // MARK: - Gemini
@@ -167,7 +208,10 @@ public static class AiClient
         return text;
     }
 
-    private static async Task<JsonNode> Send(HttpRequestMessage request, string name, CancellationToken cancel)
+    /// Sends the request and returns its JSON. <paramref name="localModel"/> is set for Local, where failing to
+    /// connect means the server isn't running and a 404 means the model isn't pulled.
+    private static async Task<JsonNode> Send(HttpRequestMessage request, string name, CancellationToken cancel,
+                                             string? localModel = null)
     {
         HttpResponseMessage response;
         try
@@ -176,7 +220,7 @@ public static class AiClient
         }
         catch (HttpRequestException)
         {
-            throw new AiException($"Couldn't reach {name}. Check your internet connection.");
+            throw new AiException(localModel != null ? LocalAi.NotRunning : $"Couldn't reach {name}. Check your internet connection.");
         }
         catch (TaskCanceledException) when (!cancel.IsCancellationRequested)
         {
@@ -195,6 +239,7 @@ public static class AiClient
                 var message = json?["error"]?["message"]?.GetValue<string>();
                 throw new AiException((int)response.StatusCode switch
                 {
+                    404 when localModel != null => LocalAi.NotPulled(localModel),
                     401 or 403 => $"{name} rejected the API key. Check it in Settings → AI.",
                     429 => $"{name} is rate limiting this key. Wait a moment and try again.",
                     >= 500 => $"{name} is having trouble right now. Try again in a minute.",

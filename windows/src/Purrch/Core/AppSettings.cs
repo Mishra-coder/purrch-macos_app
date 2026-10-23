@@ -23,6 +23,8 @@ public sealed class AppSettings : INotifyPropertyChanged
         public bool LaunchAtStartupDefaulted { get; set; }
         public string AiProvider { get; set; } = "claude";
         public bool AssistantWebSearch { get; set; }
+        public string LocalEndpoint { get; set; } = "http://localhost:11434";
+        public string LocalModel { get; set; } = "";
         public string WeatherCity { get; set; } = "";
         public bool UseFahrenheit { get; set; }
         public string RevenueCurrency { get; set; } = "usd";
@@ -112,6 +114,20 @@ public sealed class AppSettings : INotifyPropertyChanged
     {
         get => _data.AssistantWebSearch;
         set { if (_data.AssistantWebSearch != value) { _data.AssistantWebSearch = value; Changed(); } }
+    }
+
+    /// Address of the Local provider's OpenAI-compatible server: Ollama by default, or Foundry Local.
+    public string LocalEndpoint
+    {
+        get => _data.LocalEndpoint;
+        set { if (_data.LocalEndpoint != value) { _data.LocalEndpoint = value; Changed(); } }
+    }
+
+    /// Model the Local provider asks; empty means the server's first model, else llama3.2.
+    public string LocalModel
+    {
+        get => _data.LocalModel;
+        set { if (_data.LocalModel != value) { _data.LocalModel = value; Changed(); } }
     }
 
     /// City for the Weather module; empty means use this PC's location.

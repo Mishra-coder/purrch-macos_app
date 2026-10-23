@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 
@@ -160,6 +162,36 @@ public static class Ui
         box.SetResourceReference(Control.ForegroundProperty, ThemeResources.Text);
         box.SetResourceReference(TextBoxBase.CaretBrushProperty, ThemeResources.Text);
         box.SetResourceReference(TextBoxBase.SelectionBrushProperty, ThemeResources.Accent);
+        return box;
+    }
+
+    /// Read-only rich text that can be selected and copied, for answers and results; fill its Document with a
+    /// zero-margin Paragraph. The mouse wheel goes on to the list or pane around it.
+    public static RichTextBox SelectableText(double size)
+    {
+        var box = new RichTextBox
+        {
+            IsReadOnly = true,
+            BorderThickness = new Thickness(0),
+            Background = Brushes.Transparent,
+            Padding = new Thickness(0),
+            FontSize = size,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Document = new FlowDocument { PagePadding = new Thickness(0) },
+        };
+        box.SetResourceReference(Control.ForegroundProperty, ThemeResources.Text);
+        box.SetResourceReference(TextBoxBase.SelectionBrushProperty, ThemeResources.Accent);
+        // The box's own scroller would swallow the wheel even though it never scrolls.
+        box.PreviewMouseWheel += (_, e) =>
+        {
+            if (box.Parent is not UIElement parent) return;
+            e.Handled = true;
+            parent.RaiseEvent(new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+            {
+                RoutedEvent = UIElement.MouseWheelEvent,
+                Source = box,
+            });
+        };
         return box;
     }
 

@@ -43,6 +43,9 @@ public static class SecretStore
 
     private static string Target(string name) => $"Purrch:{name}";
 
+    /// A key was saved or removed (with its name), so screens waiting on one can update.
+    public static event Action<string>? Changed;
+
     /// The stored secret, or an empty string when there is none.
     public static string Get(string name)
     {
@@ -68,6 +71,7 @@ public static class SecretStore
         {
             if (!CredDelete(Target(name), CRED_TYPE_GENERIC, 0) && Marshal.GetLastWin32Error() != ERROR_NOT_FOUND)
                 Log.Write($"Credential Manager: could not delete {name} ({Marshal.GetLastWin32Error()})");
+            Changed?.Invoke(name);
             return;
         }
 
@@ -94,5 +98,6 @@ public static class SecretStore
             for (var i = 0; i < bytes.Length; i++) Marshal.WriteByte(blob, i, 0);
             Marshal.FreeHGlobal(blob);
         }
+        Changed?.Invoke(name);
     }
 }

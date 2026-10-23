@@ -14,7 +14,7 @@ The project builds on macOS, but the app only runs on Windows 10 (1809 or later)
 | 4 | Notes and Scratchpad | Done; not yet run on Windows |
 | 5 | Now Playing (Windows media session) | Done; not yet run on Windows |
 | 6 | System (CPU, memory, disk, network, battery) | Done; not yet run on Windows |
-| 7 | Assistant and Translate (Claude, OpenAI or Gemini, your own key) | Done; not yet run on Windows |
+| 7 | Assistant and Translate (Claude, OpenAI or Gemini with your own key, or a local model through Ollama or Foundry Local) | Done; not yet run on Windows |
 | 8 | Emoji, Units, Links, Shelf, Captures, File Converter, Downloads, Message, Ambience, Calendar, Weather | Done; not yet run on Windows |
 | 9 | Screen Time and Claude Code | Done; not yet run on Windows |
 | 10 | Revenue (Stripe) and Analytics (Plausible), with your own key | Done; not yet run on Windows |
@@ -156,10 +156,15 @@ None of this has run on a real Windows machine yet. Please go through the list a
 
 **Assistant**
 
-- [ ] Settings → AI: paste a Claude, OpenAI or Gemini key; "Saved" appears and the key shows up in Credential Manager → Windows Credentials as `Purrch:anthropic` / `openai` / `gemini`. Clearing the field removes it.
-- [ ] With no key, the Assistant says which key is missing. With a key, the suggestion chips and typed questions get answers; **bold** and `code` render, and right-click copies a reply.
-- [ ] The provider capsule switches between Claude, OpenAI and Gemini; for Claude, "Web search" lets it answer questions about recent events.
+- [ ] Settings → AI: paste a Claude, OpenAI or Gemini key; "Saved" appears and the key shows up in Credential Manager → Windows Credentials as `Purrch:anthropic` / `openai` / `gemini`. Clearing the field removes it. The four provider pills (Claude, OpenAI, Gemini, Local (on-device)) wrap onto a second line if the panel is narrow. Under **Local (on-device)**, **Endpoint** defaults to `http://localhost:11434` and a blank **Model** means the first model Ollama has (else `llama3.2`); both are kept in `settings.json`, and Local needs no key.
+- [ ] With no key, the Assistant says which key is missing and **Open Settings** opens Settings on AI. Pasting the key there swaps the message for the chat without reopening the Assistant.
+- [ ] With a key, the suggestion chips and typed questions get answers; **bold** and `code` render. Text in any bubble can be selected with the mouse and copied with Ctrl+C; right-click → Copy copies the selection, or the whole message when nothing is selected. The mouse wheel still scrolls the chat over a bubble.
+- [ ] While an answer is on its way the send button shows "…" and does nothing when clicked; it turns back into the arrow when the answer arrives.
+- [ ] Asking "What PC am I on?" names the maker and model (e.g. "Dell Inc. XPS 13 9310"; a self-built PC may give the motherboard maker, or "unknown PC").
+- [ ] The provider capsule switches between Claude, OpenAI, Gemini and Local (on-device); for Claude, "Web search" lets it answer questions about recent events. A question that needs several searches comes back as one answer rather than "Ask again to continue".
 - [ ] A wrong key gives a clear "rejected the API key" message, and no internet gives "Couldn't reach ...".
+- [ ] Local (on-device), with [Ollama](https://ollama.com) installed and `ollama pull llama3.2` done: Settings → AI says "Ollama is running · 1 model" and the Assistant answers with no key and no internet. Quitting Ollama: the status says "Ollama isn't running — …" and a question gets the same advice. Typing a model that isn't pulled (e.g. `qwen3`) in **Model** says "Model qwen3 isn't pulled — run `ollama pull qwen3`."
+- [ ] Optional: with Foundry Local running, putting its address (shown by `foundry service status`) in **Endpoint** and a model it has loaded in **Model** makes Local answer through it; the status line says "The local server is running · N models".
 
 **Translate**
 
@@ -379,4 +384,5 @@ How it maps to the Mac app:
 - The battery cycle count comes from the battery driver through WMI; many drivers don't keep one, and then it shows "—".
 - Claude Code reads only `%USERPROFILE%\.claude\projects`, as the Mac app reads `~/.claude/projects`; a `CLAUDE_CONFIG_DIR` set elsewhere isn't followed. A transcript line still being written is counted on the next read, a minute later.
 - Revenue counts charges in the one currency set in Settings, and reads at most 500 charges from the last seven days, as the Mac app does.
+- The Mac app's default AI provider, Apple's on-device model, has no Windows equivalent that an unpackaged app can use (Windows' own Phi Silica model needs a packaged MSIX app and a Copilot+ PC). **Local (on-device)** stands in for it: it needs [Ollama](https://ollama.com) or Microsoft Foundry Local installed and running, with a model pulled, and its answers are only as good as that model. Claude stays the default provider on Windows. Local keeps the chat history by sending it with each question, as the cloud providers do.
 - Analytics uses Plausible's Stats API v1, the same as the Mac app. "Live" is Plausible's realtime count of visitors in the last 5 minutes.
