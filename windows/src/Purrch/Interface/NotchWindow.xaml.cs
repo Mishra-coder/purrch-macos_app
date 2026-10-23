@@ -114,6 +114,10 @@ public partial class NotchWindow : Window
                     _state.EnsureSelectionEnabled();
                     ReturnFocus();
                 }
+                // Opened from the tray, a second launch or the welcome: take the keyboard, as the Mac
+                // panel does, so you can type straight away. Hover-opening leaves focus where it is,
+                // because on Windows taking keys means taking focus from the app you are in.
+                else if (_state.HoldUntilHovered) Activate();
                 break;
             case nameof(NotchState.IsPeeking):
                 Render(Motion.Peek);

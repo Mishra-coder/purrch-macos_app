@@ -344,7 +344,7 @@ How it maps to the Mac app:
 ## Known limitations
 
 - The pill always sits on the primary screen.
-- Clicking inside the open panel makes Purrch the active window. When the panel closes, keyboard focus goes back to the app you were in.
+- Opening the panel from the tray, a second launch or the welcome screen gives it the keyboard straight away. Opening it by hovering doesn't, because on Windows that would take focus from the app you are in; click inside first to type. When the panel closes, keyboard focus goes back to the app you were in.
 - The closed pill shows a message first, then a running timer, then a download, then music.
 - Chrome, Edge and Firefox don't write the expected size of a download next to the file, so download progress is estimated (as it is for Chrome on the Mac) and the percentage shows as "…".
 - Dragging files onto the closed pill opens the Shelf. To drop images on the File Converter, pin the panel first: pressing the mouse in File Explorer to start the drag closes an unpinned panel.
