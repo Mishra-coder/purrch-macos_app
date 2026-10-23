@@ -180,6 +180,7 @@ public partial class ExpandedView : UserControl
             ModuleId.Message => new Features.Media.MessageModule(),
             ModuleId.Ambience => new Features.Media.AmbienceModule(),
             ModuleId.System => new Features.Insights.SystemModule(),
+            ModuleId.ScreenTime => new Features.ScreenTime.ScreenTimeModule(),
             ModuleId.Assistant => new Features.Assistant.AssistantModule(),
             ModuleId.Translate => new Features.Translate.TranslateModule(),
             ModuleId.Shelf => new Features.Shelf.ShelfModule(),

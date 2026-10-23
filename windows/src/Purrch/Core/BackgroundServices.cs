@@ -2,6 +2,7 @@ using Purrch.Features.Clipboard;
 using Purrch.Features.Downloads;
 using Purrch.Features.Media;
 using Purrch.Features.Notes;
+using Purrch.Features.ScreenTime;
 using Purrch.Features.Timers;
 
 namespace Purrch.Core;
@@ -17,6 +18,7 @@ public static class BackgroundServices
         DownloadsService.Shared.Start();
         ClipboardService.Shared.Start();
         NowPlayingService.Shared.Start();
+        ScreenTimeService.Shared.Start();
     }
 
     /// Writes anything still waiting to be saved before Purrch quits.
@@ -27,5 +29,6 @@ public static class BackgroundServices
         MessageService.Shared.Flush();
         AmbienceEngine.Shutdown();
         DownloadsService.Shared.Flush();
+        ScreenTimeService.Shared.Flush();
     }
 }

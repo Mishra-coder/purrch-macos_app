@@ -16,8 +16,9 @@ The project builds on macOS, but the app only runs on Windows 10 (1809 or later)
 | 6 | System (CPU, memory, disk, network, battery) | Done; not yet run on Windows |
 | 7 | Assistant and Translate (Claude, OpenAI or Gemini, your own key) | Done; not yet run on Windows |
 | 8 | Emoji, Units, Links, Shelf, Captures, File Converter, Downloads, Message, Ambience, Calendar, Weather | Done; not yet run on Windows |
+| 9 | Screen Time | Done; not yet run on Windows |
 
-All 24 modules from the Mac app are in the tab bar. Home, Screen Time, Claude Code, Revenue and Analytics are not built yet and show a "Coming soon" card.
+All 24 modules from the Mac app are in the tab bar. Home, Claude Code, Revenue and Analytics are not built yet and show a "Coming soon" card.
 
 ## Build on a Mac
 
@@ -222,6 +223,17 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Settings → Integrations → Weather: typing a city (e.g. "Pune") switches the forecast to it a moment after you stop typing; an unknown city says "Couldn't find …". Clearing it goes back to your location. **Fahrenheit** switches to °F and mph at once.
 - [ ] The refresh arrow spins while loading; its tooltip says when the forecast was updated. With no internet, the last forecast stays on screen.
 
+**Screen Time**
+
+- [ ] After a few minutes of normal use, "Top apps today" lists the apps you used with their File Explorer icon, a friendly name ("Google Chrome", "Visual Studio Code", "File Explorer"), the time, and a bar relative to the top app. The header says how many apps.
+- [ ] Store apps (Settings, Calculator, Photos) are counted as themselves, not as "Application Frame Host".
+- [ ] The big total and today's bar grow while the panel stays open on Screen Time (it updates every 5 seconds). Switching between two apps for a minute each splits the time between them.
+- [ ] Leave the PC untouched for more than 2 minutes, or lock it with Win+L: that time is not counted. Watching a video without touching anything also stops counting after 2 minutes, as on the Mac.
+- [ ] Sleep and wake the PC: the time asleep is not counted.
+- [ ] The week chart shows seven bars with weekday letters, today's in the full accent, hour lines and labels on the right, and "Avg" in the header is the average of the days that have any time.
+- [ ] Quit from the tray and reopen: today's numbers are still there. On a new day the list starts empty and yesterday's bar stays. Days older than a week drop off.
+- [ ] Task Manager shows Purrch's CPU at about zero while it tracks in the background.
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -249,6 +261,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Downloads | Nothing stored; it reads your Downloads folder. Deleted files go to the Recycle Bin |
 | Calendar links and files, reminders added in Purrch, feed to-dos ticked off | `%APPDATA%\Purrch\calendar.json`, last download of each link in `calendar-cache\` |
 | Last weather forecast (city and °F are in `settings.json`) | `%APPDATA%\Purrch\weather.json` |
+| Screen Time: seconds per app per day for the last 7 days, and app names and exe paths | `%APPDATA%\Purrch\screentime.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |
@@ -290,3 +303,4 @@ How it maps to the Mac app:
 - Dragging files onto the closed pill opens the Shelf. To drop images on the File Converter, pin the panel first: pressing the mouse in File Explorer to start the drag closes an unpinned panel.
 - The exe is not code-signed, so SmartScreen warns on first run.
 - Calendar reads iCal links and .ics files, so it shows events but can't change them, and a published link can lag Google or Outlook by a few hours. Windows' own calendar store needs a packaged (MSIX) app.
+- Screen Time counts the app in front, so a window you are only reading or watching counts until the 2-minute idle limit, as on the Mac. Apps are grouped by exe name, so two different `python.exe` show as one.
