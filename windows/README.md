@@ -98,9 +98,11 @@ None of this has run on a real Windows machine yet. Please go through the list a
 
 **Home**
 
-- [ ] Home shows "Good morning" (afternoon, evening, night) and the time in large digits, with AM/PM beside it on a 12-hour clock and without it on a 24-hour clock. The time ticks over on the minute.
-- [ ] The battery chip shows the level and Charging / Plugged in / Battery, green while charging and red below 20%; on a desktop or VM it shows "AC". Clicking it opens System.
+- [ ] Home shows "Good morning" (afternoon, evening, night) and the time in large digits, with AM/PM beside it on a 12-hour clock and without it on a 24-hour clock. The time ticks over on the minute, and only the digits that change roll in from above.
+- [ ] In the Playful theme the hero's colour wash is Home's own colour, also right after switching from another module.
+- [ ] The battery chip shows the level and Charging / Plugged in / Battery, green while charging and red below 20%, with a battery icon that fills with the level (with a bolt while charging); on a desktop or VM it shows "AC". Clicking it opens System.
 - [ ] The weather chip shows the temperature with a colour icon and the town (or "--" before the first forecast); clicking it opens Weather. Changing **Fahrenheit** in Settings updates it.
+- [ ] Leave Purrch running for over 20 minutes without opening the panel: Home's weather chip is already up to date when you open it (the forecast refreshes in the background, as on the Mac).
 - [ ] With no calendars, the event chip says "Connect" and opens Calendar. With one, it shows the next event's title and "in 25m", "in 2h 5m", "in 1d" or "Now", in the calendar's colour; with nothing coming up it says "Free".
 - [ ] System shows CPU, RAM and Disk rings that match the System module; clicking the card opens System.
 - [ ] Launch shows Edge, File Explorer, Notepad, Calculator, PowerShell and Settings with their icons (an app that isn't installed is left out). Hovering grows an icon and shows its name; clicking opens the app and closes the panel. Right-click offers Open, Show in File Explorer and Remove from Launch.

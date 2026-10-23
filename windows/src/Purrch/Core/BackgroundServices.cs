@@ -4,6 +4,7 @@ using Purrch.Features.Media;
 using Purrch.Features.Notes;
 using Purrch.Features.ScreenTime;
 using Purrch.Features.Timers;
+using Purrch.Features.Weather;
 
 namespace Purrch.Core;
 
@@ -18,6 +19,8 @@ public static class BackgroundServices
         ClipboardService.Shared.Start();
         NowPlayingService.Shared.Start();
         ScreenTimeService.Shared.Start();
+        // Keeps the forecast fresh for Home's chip. It never calls Stop, so this counts as a user for good.
+        WeatherService.Shared.Start();
     }
 
     /// Writes anything still waiting to be saved before Purrch quits.

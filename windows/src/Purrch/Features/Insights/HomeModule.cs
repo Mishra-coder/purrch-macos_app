@@ -28,7 +28,7 @@ public sealed class HomeModule : Grid
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1) };
 
     private readonly TextBlock _greeting = Ui.Text("", 12, ThemeResources.SecondaryText, FontWeights.Medium);
-    private readonly TextBlock _time = Ui.Text("", 44, weight: FontWeights.Bold).Tabular();
+    private readonly RollingText _time = new(44, FontWeights.Bold);
     private readonly TextBlock _amPm = Ui.Text("", 14, ThemeResources.SecondaryText, FontWeights.SemiBold);
     private readonly StackPanel _chips = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly RingGauge _cpu = new("CPU");
@@ -97,7 +97,8 @@ public sealed class HomeModule : Grid
 
     private UIElement Hero()
     {
-        var accent = ((SolidColorBrush)Application.Current.FindResource(ThemeResources.Accent)).Color;
+        // Home's own tint (its colour in Playful), not whichever module was on screen before.
+        var accent = AppSettings.Shared.Theme.AccentFor(ModuleId.Home);
         var surface = new Border { Style = (Style)Application.Current.FindResource("Purrch.Card") };
         var wash = new Border
         {
@@ -107,7 +108,6 @@ public sealed class HomeModule : Grid
         };
 
         var clock = new StackPanel { Orientation = Orientation.Horizontal };
-        _time.TextWrapping = TextWrapping.NoWrap;
         clock.Children.Add(_time);
         _amPm.Margin = new Thickness(4, 0, 0, 7);
         _amPm.VerticalAlignment = VerticalAlignment.Bottom;
@@ -140,7 +140,7 @@ public sealed class HomeModule : Grid
         };
         // Follows the Windows clock: "9:41" with "AM" beside it, or "21:41" on a 24-hour clock.
         var twelveHour = CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern.Contains('h');
-        _time.Text = now.ToString(twelveHour ? "h:mm" : "HH:mm", CultureInfo.CurrentCulture);
+        _time.Set(now.ToString(twelveHour ? "h:mm" : "HH:mm", CultureInfo.CurrentCulture));
         _amPm.Text = twelveHour ? now.ToString("tt", CultureInfo.CurrentCulture) : "";
         RefreshChips();
     }
@@ -157,7 +157,7 @@ public sealed class HomeModule : Grid
     {
         var b = _monitor.Battery;
         var colour = b.IsCharging ? Green : b.Present && b.Level < 0.2 ? Red : (Color?)null;
-        var icon = Ui.Glyph(b.Present ? "\uE83F" : "\uE83E", 13);
+        var icon = Ui.Glyph(b.Present ? b.Glyph : "\uE83E", 13);
         if (colour is { } c) icon.Foreground = c.Brush();
         return Chip(icon,
             b.Present ? $"{Math.Round(b.Level * 100)}%" : "AC",
@@ -425,5 +425,70 @@ public sealed class HomeModule : Grid
         body.Children.Add(track);
         body.Children.Add(controls);
         _playing.Content = new Card("Now Playing", "\uE8D6", body, open);
+    }
+}
+
+/// Text whose changed characters roll in: the old one slides down and fades while the new one drops in from
+/// above, like the Mac clock's numeric content transition. Unchanged characters stay still.
+internal sealed class RollingText : StackPanel
+{
+    private const double Travel = 14;
+
+    private readonly double _size;
+    private readonly FontWeight _weight;
+    private string _text = "";
+
+    public RollingText(double size, FontWeight weight)
+    {
+        _size = size;
+        _weight = weight;
+        Orientation = Orientation.Horizontal;
+    }
+
+    public void Set(string text)
+    {
+        if (text == _text) return;
+        // A different length ("9:59" to "10:00") just swaps; the characters no longer line up.
+        if (_text.Length != text.Length || !IsLoaded)
+        {
+            Children.Clear();
+            foreach (var c in text) Children.Add(Slot(c));
+            _text = text;
+            return;
+        }
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] == _text[i]) continue;
+            var slot = (Grid)Children[i];
+            foreach (var old in slot.Children.OfType<TextBlock>().ToList())
+            {
+                ((TranslateTransform)old.RenderTransform).Animate(TranslateTransform.YProperty, Travel, Motion.ExpoOut(0.4));
+                old.Animate(OpacityProperty, 0, Motion.ExpoOut(0.3), completed: () => slot.Children.Remove(old));
+            }
+            var glyph = Glyph(text[i]);
+            glyph.Opacity = 0;
+            var shift = (TranslateTransform)glyph.RenderTransform;
+            shift.Y = -Travel;
+            slot.Children.Add(glyph);
+            shift.Animate(TranslateTransform.YProperty, 0, Motion.ExpoOut(0.5));
+            glyph.Animate(OpacityProperty, 1, Motion.ExpoOut(0.4));
+        }
+        _text = text;
+    }
+
+    private Grid Slot(char c)
+    {
+        var slot = new Grid { ClipToBounds = true };
+        slot.Children.Add(Glyph(c));
+        return slot;
+    }
+
+    private TextBlock Glyph(char c)
+    {
+        var t = Ui.Text(c.ToString(), _size, weight: _weight).Tabular();
+        t.TextWrapping = TextWrapping.NoWrap;
+        t.HorizontalAlignment = HorizontalAlignment.Center;
+        t.RenderTransform = new TranslateTransform();
+        return t;
     }
 }
