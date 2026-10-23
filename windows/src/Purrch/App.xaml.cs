@@ -45,6 +45,14 @@ public partial class App : Application
         BackgroundServices.Start();
         OpenRequested += () => NotchState.Shared.Present();
         AppSettings.Shared.ApplyStartupDefault();
+
+        // On first run the welcome screen comes down by itself, so nobody has to find the pill first.
+        if (!AppSettings.Shared.HasCompletedOnboarding)
+        {
+            var welcome = new DispatcherTimer { Interval = TimeSpan.FromSeconds(0.6) };
+            welcome.Tick += (_, _) => { welcome.Stop(); NotchState.Shared.Present(); };
+            welcome.Start();
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)

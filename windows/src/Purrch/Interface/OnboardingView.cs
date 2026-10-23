@@ -36,7 +36,7 @@ public sealed class OnboardingView : Grid
         title.Children.Add(heading);
         intro.Children.Add(title);
 
-        var blurb = Ui.Text("The top of your screen is now a small control centre. Hover over the pill to open it, move away to close.",
+        var blurb = Ui.Text("The top of your screen is now a small control centre with 24 tools. Hover over the pill to open it, move away to close. Drop files on it to park them on the shelf.",
             13, ThemeResources.SecondaryText);
         blurb.Margin = new Thickness(0, 10, 0, 10);
         intro.Children.Add(blurb);
