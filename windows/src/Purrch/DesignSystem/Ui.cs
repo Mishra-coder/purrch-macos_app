@@ -13,6 +13,9 @@ namespace Purrch.DesignSystem;
 /// Colours come from the theme resources, so everything recolours when the theme changes.
 public static class Ui
 {
+    /// Windows' own red for destructive actions on its light menus.
+    private static readonly Color Destructive = Color.FromRgb(0xC4, 0x2B, 0x1C);
+
     public static TextBlock Text(string text, double size = 12, string colour = ThemeResources.Text,
                                  FontWeight? weight = null)
     {
@@ -163,6 +166,8 @@ public static class Ui
         box.SetResourceReference(Control.ForegroundProperty, ThemeResources.Text);
         box.SetResourceReference(TextBoxBase.CaretBrushProperty, ThemeResources.Text);
         box.SetResourceReference(TextBoxBase.SelectionBrushProperty, ThemeResources.Accent);
+        // Editors for prose underline misspellings, as the Mac's text views do.
+        box.SpellCheck.IsEnabled = multiline;
         return box;
     }
 
@@ -227,6 +232,15 @@ public static class Ui
             keep--;
         }
         return "…";
+    }
+
+    /// Context-menu entry. Destructive ones (Delete, Remove) are red, like a destructive button in a Mac menu.
+    public static MenuItem MenuEntry(string header, Action onClick, bool destructive = false)
+    {
+        var item = new MenuItem { Header = header };
+        if (destructive) item.Foreground = Destructive.Brush();
+        item.Click += (_, _) => onClick();
+        return item;
     }
 
     /// Lays a grey placeholder over a text box while it is empty.

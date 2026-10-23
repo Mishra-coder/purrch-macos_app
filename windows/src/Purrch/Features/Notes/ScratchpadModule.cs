@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -143,7 +144,8 @@ public sealed class ScratchpadModule : DockPanel
     {
         var text = _editor.Text;
         var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
-        _stats.Text = $"{text.Length} chars · {words} words";
+        // Counted as you see them, like Swift's String.count: an emoji or an accented letter is one character.
+        _stats.Text = $"{new StringInfo(text).LengthInTextElements} chars · {words} words";
     }
 
     private void RefreshCopy(bool copied)

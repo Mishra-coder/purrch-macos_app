@@ -27,11 +27,17 @@ public sealed class NotesModule : Grid
 
         var sidebar = new DockPanel();
         var top = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
-        var add = Ui.IconButton("\uE710", 32, () => _store.Add(), prominent: true, tooltip: "New note");
+        var search = Ui.SearchField("Search notes", q => { _query = q; RebuildList(); }, out var searchBox);
+        // A new note is empty, so a search would hide it straight away.
+        var add = Ui.IconButton("\uE710", 32, () =>
+        {
+            searchBox.Text = "";
+            _store.Add();
+        }, prominent: true, tooltip: "New note");
         add.Margin = new Thickness(6, 0, 0, 0);
         DockPanel.SetDock(add, Dock.Right);
         top.Children.Add(add);
-        top.Children.Add(Ui.SearchField("Search notes", q => { _query = q; RebuildList(); }, out _));
+        top.Children.Add(search);
         DockPanel.SetDock(top, Dock.Top);
         sidebar.Children.Add(top);
         _listScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = _list };
@@ -117,13 +123,13 @@ public sealed class NotesModule : Grid
         };
 
         var menu = new ContextMenu();
-        var convert = new MenuItem { Header = note.IsChecklist ? "Convert to Text" : "Convert to Checklist" };
-        convert.Click += (_, _) => { note.IsChecklist = !note.IsChecklist; _store.Touch(note); };
-        var delete = new MenuItem { Header = "Delete" };
-        delete.Click += (_, _) => _store.Delete(note.Id);
-        menu.Items.Add(convert);
+        menu.Items.Add(Ui.MenuEntry(note.IsChecklist ? "Convert to Text" : "Convert to Checklist", () =>
+        {
+            note.IsChecklist = !note.IsChecklist;
+            _store.Touch(note);
+        }));
         menu.Items.Add(new Separator());
-        menu.Items.Add(delete);
+        menu.Items.Add(Ui.MenuEntry("Delete", () => _store.Delete(note.Id), destructive: true));
         card.ContextMenu = menu;
         return card;
     }
@@ -274,21 +280,49 @@ internal sealed class NoteEditor : Border
             _items.Children.Add(empty);
         }
         foreach (var item in _note.Items) _items.Children.Add(ItemRow(item));
+        UpdateCount();
+        if (scrollToEnd && _items.Parent is ScrollViewer scroll) scroll.ScrollToEnd();
+    }
 
+    private void UpdateCount()
+    {
         var done = _note.Items.Count(i => i.Done);
         _count.Text = _note.Items.Count == 0 ? "" : $"{done}/{_note.Items.Count}";
         _clearDone.Visibility = done > 0 ? Visibility.Visible : Visibility.Collapsed;
-        if (scrollToEnd && _items.Parent is ScrollViewer scroll) scroll.ScrollToEnd();
     }
 
     private UIElement ItemRow(NoteCheckItem item)
     {
         var row = new DockPanel();
-        var check = Ui.Bare(Ui.Glyph(item.Done ? "\uEC61" : "\uEA3A", 15, item.Done ? ThemeResources.Accent : ThemeResources.SecondaryText), () =>
+        var mark = Ui.Glyph("", 15);
+        var input = Ui.Input(item.Text, 13);
+        // Done items stay editable, struck through in the secondary colour.
+        void ShowState()
+        {
+            mark.Text = item.Done ? "\uEC61" : "\uEA3A";
+            mark.SetResourceReference(TextBlock.ForegroundProperty, item.Done ? ThemeResources.Accent : ThemeResources.SecondaryText);
+            input.SetResourceReference(Control.ForegroundProperty, item.Done ? ThemeResources.SecondaryText : ThemeResources.Text);
+            input.TextDecorations = item.Done ? TextDecorations.Strikethrough : null;
+        }
+        ShowState();
+
+        var tick = new ScaleTransform(1, 1);
+        mark.RenderTransformOrigin = new Point(0.5, 0.5);
+        mark.RenderTransform = tick;
+        Button? check = null;
+        check = Ui.Bare(mark, () =>
         {
             item.Done = !item.Done;
             _store.Touch(_note);
-            RebuildItems();
+            ShowState();
+            check!.ToolTip = item.Done ? "Mark as not done" : "Mark as done";
+            // A quick 0.15 s ease, like the Mac's withAnimation(.easeOut(duration: 0.15)).
+            tick.ScaleX = tick.ScaleY = 0.7;
+            tick.Animate(ScaleTransform.ScaleXProperty, 1, Motion.EaseOut(0.15));
+            tick.Animate(ScaleTransform.ScaleYProperty, 1, Motion.EaseOut(0.15));
+            input.Opacity = 0.4;
+            input.Animate(OpacityProperty, 1, Motion.EaseOut(0.15));
+            UpdateCount();
         }, item.Done ? "Mark as not done" : "Mark as done");
         check.Margin = new Thickness(0, 0, 8, 0);
         DockPanel.SetDock(check, Dock.Left);
@@ -304,21 +338,8 @@ internal sealed class NoteEditor : Border
         DockPanel.SetDock(remove, Dock.Right);
         row.Children.Add(remove);
 
-        if (item.Done)
-        {
-            // Done items read as struck through; untick to edit them again.
-            var text = Ui.Text(item.Text, 13, ThemeResources.SecondaryText);
-            text.TextDecorations = TextDecorations.Strikethrough;
-            text.TextWrapping = TextWrapping.NoWrap;
-            text.TextTrimming = TextTrimming.CharacterEllipsis;
-            row.Children.Add(text);
-        }
-        else
-        {
-            var input = Ui.Input(item.Text, 13);
-            input.TextChanged += (_, _) => { item.Text = input.Text; _store.Touch(_note); };
-            row.Children.Add(input);
-        }
+        input.TextChanged += (_, _) => { item.Text = input.Text; _store.Touch(_note); };
+        row.Children.Add(input);
 
         var frame = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(6, 4, 6, 4), Margin = new Thickness(0, 0, 0, 2), Child = row, Background = Brushes.Transparent };
         frame.MouseEnter += (_, _) => { remove.Visibility = Visibility.Visible; frame.SetResourceReference(BackgroundProperty, ThemeResources.Hairline); };

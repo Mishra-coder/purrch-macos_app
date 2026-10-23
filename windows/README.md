@@ -134,8 +134,9 @@ None of this has run on a real Windows machine yet. Please go through the list a
 
 **Notes and Scratchpad**
 
-- [ ] Notes: + makes a new note; typing a title updates the list on the left. Enter in "Add an item" adds it and keeps the cursor there. Ticking an item strikes it through; "Clear done" removes ticked items. The toggle switches between checklist and text. Right-click a note to convert or delete it.
-- [ ] Scratchpad: typing is kept after quitting and reopening Purrch. Text size, monospaced font, Copy all and Clear (two clicks) work.
+- [ ] Notes: + clears the search and makes a new note; typing a title updates the list on the left. Enter in "Add an item" adds it and keeps the cursor there. Ticking an item strikes it through and greys it with a quick pop of the tick; a ticked item can still be edited. "Clear done" removes ticked items. The toggle switches between checklist and text. Right-click a note to convert or delete it; Delete is red.
+- [ ] Misspelled words get a red squiggle in a text note, the Scratchpad and Translate's input, and right-clicking one offers corrections. Titles and checklist items aren't checked.
+- [ ] Scratchpad: typing is kept after quitting and reopening Purrch. Text size, monospaced font, Copy all and Clear (two clicks) work. The count shows an emoji like 👍🏽 or an accented letter as one character.
 - [ ] After typing in a note, moving the pointer away closes the panel and your next keystrokes go to the app you were in before.
 
 **Now Playing**
