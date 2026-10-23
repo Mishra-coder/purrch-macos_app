@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Purrch",
+  "short_name": "Purrch",
+  "version": "1.0.0",
+  "description": "Shows and controls the YouTube videos open in this browser from Purrch's pill on Windows.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw1c6mMsLzPH9+d1EYHYjmD+5UwaIsdlQO49Znss2MOV6vSi5jcad6+9m+sq+Ps6UVXDKu8S0LyNiTs6R+y36KGkuLmlUuBCUiv60lp7Vprtzy1bTxGuyBcWmdVh/1Z8Mdpg4QceazObF/03UDtrVatD2WyeXEfhC/C18znXbI+8I/NtdpRHA3hdpM2x+ZBLEHHG03mDG7WBepMeh1YyAJFvtZ20R6zNd+xc2WiuGCfZod4SMZ8Qzk0qecODnv8hgoMYkCRUJQ69vXVuVN8qeEdZZV6mJY07ABv4jLca3ip+/NTbi2uGCkqOWbt0zXTogbuD8MxW2uwEUxsBq7m3mGwIDAQAB",
+  "minimum_chrome_version": "111",
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "permissions": ["nativeMessaging", "scripting", "alarms"],
+  "host_permissions": ["https://www.youtube.com/*", "https://music.youtube.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*", "https://music.youtube.com/*"],
+      "js": ["page.js"],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.youtube.com/*", "https://music.youtube.com/*"],
+      "js": ["relay.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

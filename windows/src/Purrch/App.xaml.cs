@@ -19,6 +19,14 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Started by Chrome, Edge, Brave or Vivaldi as the extension's native messaging host: relay to the
+        // running Purrch and leave, before the single-instance check (which would treat this as a second launch).
+        if (Features.Media.BrowserBridge.IsHostLaunch(e.Args))
+        {
+            Shutdown(Features.Media.BrowserBridge.RunHost());
+            return;
+        }
+
         // "Purrch.exe timers", "Purrch.exe settings" or "Purrch.exe close", like the Mac's script hook.
         var command = e.Args.FirstOrDefault(a => !a.StartsWith('-')) ?? "";
         _instanceMutex = new Mutex(initiallyOwned: true, MutexName, out var isFirst);

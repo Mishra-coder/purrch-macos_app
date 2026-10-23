@@ -36,6 +36,9 @@
     <Resource Include="Assets\Tray.ico" />
     <!-- Made by windows/tools/make-emoji-catalog.sh from the Mac app's emoji list. -->
     <EmbeddedResource Include="Assets\Emoji.tsv" LogicalName="Purrch.Emoji.tsv" />
+    <!-- The browser extension (windows/extension), written out only when "Connect browser" is clicked in Settings. -->
+    <EmbeddedResource Include="..\..\extension\*" Exclude="..\..\extension\README.md"
+                      LogicalName="Purrch.Extension.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
