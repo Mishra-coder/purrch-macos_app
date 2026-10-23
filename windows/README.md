@@ -16,9 +16,9 @@ The project builds on macOS, but the app only runs on Windows 10 (1809 or later)
 | 6 | System (CPU, memory, disk, network, battery) | Done; not yet run on Windows |
 | 7 | Assistant and Translate (Claude, OpenAI or Gemini, your own key) | Done; not yet run on Windows |
 | 8 | Emoji, Units, Links, Shelf, Captures, File Converter, Downloads, Message, Ambience, Calendar, Weather | Done; not yet run on Windows |
-| 9 | Screen Time | Done; not yet run on Windows |
+| 9 | Screen Time and Claude Code | Done; not yet run on Windows |
 
-All 24 modules from the Mac app are in the tab bar. Home, Claude Code, Revenue and Analytics are not built yet and show a "Coming soon" card.
+All 24 modules from the Mac app are in the tab bar. Home, Revenue and Analytics are not built yet and show a "Coming soon" card.
 
 ## Build on a Mac
 
@@ -234,6 +234,15 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Quit from the tray and reopen: today's numbers are still there. On a new day the list starts empty and yesterday's bar stays. Days older than a week drop off.
 - [ ] Task Manager shows Purrch's CPU at about zero while it tracks in the background.
 
+**Claude Code**
+
+- [ ] Without Claude Code (no `%USERPROFILE%\.claude\projects` folder), the tab says "No Claude Code data yet" and doesn't crash.
+- [ ] With Claude Code used today, the tab says "Reading transcripts…" briefly, then shows today's tokens in large accent digits, Output, Tool calls and Sessions, the folder name of the project used last, and "active now" or "5m ago".
+- [ ] Tokens are input, output, cache-write and cache-read added up, each message counted once: quitting and reopening Purrch, or resuming a session with `claude --resume`, doesn't make today's total jump.
+- [ ] "Last 16 weeks" shows a grid with a square per day, busier days in a stronger accent, today outlined, and future days of this week empty. Hovering a square shows its date and tokens. The header shows the day streak with a lit flame, and the footer the total and active days.
+- [ ] While a Claude Code session runs, the numbers go up within a minute with the panel open on Claude Code; a small spinning arrow in the Today card shows while it reads.
+- [ ] With months of transcripts, the first read takes a few seconds at most and the panel stays responsive; later reads are quick.
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -262,6 +271,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Calendar links and files, reminders added in Purrch, feed to-dos ticked off | `%APPDATA%\Purrch\calendar.json`, last download of each link in `calendar-cache\` |
 | Last weather forecast (city and °F are in `settings.json`) | `%APPDATA%\Purrch\weather.json` |
 | Screen Time: seconds per app per day for the last 7 days, and app names and exe paths | `%APPDATA%\Purrch\screentime.json` |
+| Claude Code (read from, nothing saved) | `%USERPROFILE%\.claude\projects` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |
@@ -304,3 +314,4 @@ How it maps to the Mac app:
 - The exe is not code-signed, so SmartScreen warns on first run.
 - Calendar reads iCal links and .ics files, so it shows events but can't change them, and a published link can lag Google or Outlook by a few hours. Windows' own calendar store needs a packaged (MSIX) app.
 - Screen Time counts the app in front, so a window you are only reading or watching counts until the 2-minute idle limit, as on the Mac. Apps are grouped by exe name, so two different `python.exe` show as one.
+- Claude Code reads only `%USERPROFILE%\.claude\projects`, as the Mac app reads `~/.claude/projects`; a `CLAUDE_CONFIG_DIR` set elsewhere isn't followed. A transcript line still being written is counted on the next read, a minute later.
