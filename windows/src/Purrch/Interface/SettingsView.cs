@@ -49,6 +49,14 @@ public sealed class SettingsView : Grid
         Unloaded += (_, _) => _settings.PropertyChanged -= OnSettingsChanged;
     }
 
+    /// Opens the panel's settings on a section, for a module's "Open Settings" button.
+    public static void Open(Section section)
+    {
+        _section = section;
+        NotchState.Shared.SwitchDirection = 1;
+        NotchState.Shared.ShowSettings = true;
+    }
+
     private void OnSettingsChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(AppSettings.ModuleOrder) && _section == Section.Modules) Show(Section.Modules);
@@ -180,9 +188,9 @@ public sealed class SettingsView : Grid
         Add(providers);
         Add(Ui.Text("The Assistant and Translate use your own API key. Keys are kept in Windows Credential Manager, " +
                     "never in Purrch's files.", 11, ThemeResources.SecondaryText));
-        Add(Secret("Anthropic API key (Claude)", AiProvider.Claude));
-        Add(Secret("OpenAI API key", AiProvider.OpenAI));
-        Add(Secret("Gemini API key (free at aistudio.google.com/apikey)", AiProvider.Gemini));
+        Add(Secret("Anthropic API key (Claude)", AiProvider.Claude.SecretName()));
+        Add(Secret("OpenAI API key", AiProvider.OpenAI.SecretName()));
+        Add(Secret("Gemini API key (free at aistudio.google.com/apikey)", AiProvider.Gemini.SecretName()));
         Add(Toggle("Web search", "Let Claude search the web when it needs fresh information.",
             _settings.AssistantWebSearch, v => _settings.AssistantWebSearch = v));
     }
@@ -192,6 +200,11 @@ public sealed class SettingsView : Grid
         Add(Heading("Weather"));
         Add(Plain("City (blank = use location)", _settings.WeatherCity, v => _settings.WeatherCity = v));
         Add(Toggle("Fahrenheit", "", _settings.UseFahrenheit, v => _settings.UseFahrenheit = v));
+
+        Add(Heading("Revenue (Stripe)"));
+        Add(Secret("Restricted read-only key (rk_...)", Features.Revenue.RevenueService.SecretName));
+        Add(Plain("Currency (usd, eur, inr...)", _settings.RevenueCurrency, v => _settings.RevenueCurrency = v));
+
     }
 
     /// A plain text field. Commits a moment after typing stops, so each key doesn't start a new lookup.
@@ -231,11 +244,11 @@ public sealed class SettingsView : Grid
     }
 
     /// A masked key field. Saves to Credential Manager a moment after typing stops; clearing it deletes the key.
-    private static UIElement Secret(string title, AiProvider provider)
+    private static UIElement Secret(string title, string name)
     {
         var box = new PasswordBox
         {
-            Password = SecretStore.Get(provider.SecretName()),
+            Password = SecretStore.Get(name),
             BorderThickness = new Thickness(0),
             Background = Brushes.Transparent,
             FontSize = 13,
@@ -248,7 +261,7 @@ public sealed class SettingsView : Grid
         save.Tick += (_, _) =>
         {
             save.Stop();
-            SecretStore.Set(provider.SecretName(), box.Password.Trim());
+            SecretStore.Set(name, box.Password.Trim());
             saved.Text = box.Password.Length == 0 ? "Removed" : "Saved";
         };
         box.PasswordChanged += (_, _) => { saved.Text = ""; save.Stop(); save.Start(); };

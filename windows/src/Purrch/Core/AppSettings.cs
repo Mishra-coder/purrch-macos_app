@@ -27,6 +27,7 @@ public sealed class AppSettings : INotifyPropertyChanged
         public bool AssistantWebSearch { get; set; }
         public string WeatherCity { get; set; } = "";
         public bool UseFahrenheit { get; set; }
+        public string RevenueCurrency { get; set; } = "usd";
     }
 
     private static readonly JsonSerializerOptions Json = new()
@@ -122,6 +123,13 @@ public sealed class AppSettings : INotifyPropertyChanged
     {
         get => _data.UseFahrenheit;
         set { if (_data.UseFahrenheit != value) { _data.UseFahrenheit = value; Changed(); } }
+    }
+
+    /// ISO code of the Stripe charges Revenue counts ("usd"); charges in other currencies are left out.
+    public string RevenueCurrency
+    {
+        get => _data.RevenueCurrency;
+        set { if (_data.RevenueCurrency != value) { _data.RevenueCurrency = value; Changed(); } }
     }
 
     /// Lives in the registry, not settings.json, so Task Manager's Startup tab and this toggle agree.

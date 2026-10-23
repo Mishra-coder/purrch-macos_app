@@ -17,8 +17,9 @@ The project builds on macOS, but the app only runs on Windows 10 (1809 or later)
 | 7 | Assistant and Translate (Claude, OpenAI or Gemini, your own key) | Done; not yet run on Windows |
 | 8 | Emoji, Units, Links, Shelf, Captures, File Converter, Downloads, Message, Ambience, Calendar, Weather | Done; not yet run on Windows |
 | 9 | Screen Time and Claude Code | Done; not yet run on Windows |
+| 10 | Revenue (Stripe), with your own key | Done; not yet run on Windows |
 
-All 24 modules from the Mac app are in the tab bar. Home, Revenue and Analytics are not built yet and show a "Coming soon" card.
+All 24 modules from the Mac app are in the tab bar. Home and Analytics are not built yet and show a "Coming soon" card.
 
 ## Build on a Mac
 
@@ -243,6 +244,17 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] While a Claude Code session runs, the numbers go up within a minute with the panel open on Claude Code; a small spinning arrow in the Today card shows while it reads.
 - [ ] With months of transcripts, the first read takes a few seconds at most and the panel stays responsive; later reads are quick.
 
+**Revenue**
+
+- [ ] With no Stripe key, Revenue says "Connect Stripe"; **Open Settings** opens Settings on Integrations.
+- [ ] Settings → Integrations → Revenue (Stripe): paste a restricted key (`rk_live_...` or `rk_test_...`) with Charges: Read. "Saved" appears and the key shows up in Credential Manager → Windows Credentials as `Purrch:stripe`. Clearing the field says "Removed" and deletes it.
+- [ ] With a test-mode key and a few test payments made today, "Today" shows the total in large accent digits ("$1,250", or "$12.50" when there are cents) and "3 sales · USD". "7 days" has a bar per day with the weekday's first letter, today's bar brighter and the week's total on the right; hovering a bar shows "Monday: $40".
+- [ ] "Sales" lists today's payments newest first, with the customer's email (or the description, or the name), the time and the amount. A fully refunded payment is left out; a partly refunded one shows what was kept. No payments today says "No sales yet today".
+- [ ] Changing Currency to `eur` (or `jpy`, which has no cents) shows only payments in that currency, with its symbol, after a moment.
+- [ ] A made-up key says "Stripe rejected the key…"; a restricted key without Charges: Read says "This key can't read charges…". Both offer **Try again** and **Open Settings**.
+- [ ] A new test payment appears within about a minute while the tab is open; the refresh arrow in "Sales" fetches at once and spins meanwhile.
+- [ ] Turn off Wi-Fi and reopen Purrch: the last figures stay on screen, with a warning sign next to the time; its tooltip says "Couldn't reach Stripe… Showing the last copy." With no copy yet, the Sales card says "Couldn't load Stripe".
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -272,8 +284,9 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Last weather forecast (city and °F are in `settings.json`) | `%APPDATA%\Purrch\weather.json` |
 | Screen Time: seconds per app per day for the last 7 days, and app names and exe paths | `%APPDATA%\Purrch\screentime.json` |
 | Claude Code (read from, nothing saved) | `%USERPROFILE%\.claude\projects` |
+| Last Stripe figures (the currency is in `settings.json`, the key in Credential Manager) | `%APPDATA%\Purrch\revenue.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
-| API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
+| API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` (`anthropic`, `openai`, `gemini`, `stripe`) |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |
 
 To reset Purrch completely, quit it from the tray, delete `%APPDATA%\Purrch`, and turn off **Purrch** in Task Manager → Startup apps (or delete the Run value).
@@ -315,3 +328,4 @@ How it maps to the Mac app:
 - Calendar reads iCal links and .ics files, so it shows events but can't change them, and a published link can lag Google or Outlook by a few hours. Windows' own calendar store needs a packaged (MSIX) app.
 - Screen Time counts the app in front, so a window you are only reading or watching counts until the 2-minute idle limit, as on the Mac. Apps are grouped by exe name, so two different `python.exe` show as one.
 - Claude Code reads only `%USERPROFILE%\.claude\projects`, as the Mac app reads `~/.claude/projects`; a `CLAUDE_CONFIG_DIR` set elsewhere isn't followed. A transcript line still being written is counted on the next read, a minute later.
+- Revenue counts charges in the one currency set in Settings, and reads at most 500 charges from the last seven days, as the Mac app does.

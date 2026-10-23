@@ -177,6 +177,7 @@ public partial class ExpandedView : UserControl
             ModuleId.Claude => new Features.ClaudeCode.ClaudeCodeModule(),
             ModuleId.Calendar => new Features.Calendar.CalendarModule(),
             ModuleId.Weather => new Features.Weather.WeatherModule(),
+            ModuleId.Revenue => new Features.Revenue.RevenueModule(),
             ModuleId.NowPlaying => new Features.Media.NowPlayingModule(),
             ModuleId.Message => new Features.Media.MessageModule(),
             ModuleId.Ambience => new Features.Media.AmbienceModule(),
