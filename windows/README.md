@@ -162,6 +162,15 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] With no speakers or headphones (or audio turned off in Device Manager), tapping a tile does nothing and Purrch doesn't crash; `purrch.log` says "no audio output".
 - [ ] Quitting from the tray while sounds play stops them at once. A few seconds after everything stops, Purrch's CPU use in Task Manager drops back to about zero.
 
+**Shelf**
+
+- [ ] Dragging a file from File Explorer onto the closed pill opens the panel on Shelf; dropping it there adds a tile with its thumbnail (pictures, videos, PDFs) or icon, a type tag, its name and size. While dragging, the area shows a dashed outline and "Release to add".
+- [ ] **Add** picks files with the Open dialog. A file already on the shelf isn't added twice. Folders can be dropped too.
+- [ ] Dragging a tile into a folder, an email or a chat box drops the file itself (copied, the original stays where it was). Double-click opens it.
+- [ ] Hover shows Share and remove; right-click shows Open, Show in File Explorer, Copy, Share and Remove from Shelf. Copy then Ctrl+V in File Explorer pastes the file; for a picture, Ctrl+V in a chat pastes the image.
+- [ ] Share opens the Windows share sheet (Nearby Sharing, Mail, ...). With two or more files, **Share all** sends them together.
+- [ ] The shelf is the same after restarting Purrch. A file deleted or moved away in File Explorer disappears from the shelf the next time you open it.
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -182,6 +191,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Links: saved sites and search engine | `%APPDATA%\Purrch\links.json` |
 | Message text and whether it shows | `%APPDATA%\Purrch\message.json` |
 | Ambience volumes | `%APPDATA%\Purrch\ambience.json` |
+| Shelf (paths only; the files stay where they are) | `%APPDATA%\Purrch\shelf.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |

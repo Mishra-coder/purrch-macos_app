@@ -178,6 +178,7 @@ public partial class ExpandedView : UserControl
             ModuleId.System => new Features.Insights.SystemModule(),
             ModuleId.Assistant => new Features.Assistant.AssistantModule(),
             ModuleId.Translate => new Features.Translate.TranslateModule(),
+            ModuleId.Shelf => new Features.Shelf.ShelfModule(),
             _ => new ModulePlaceholder(_state.Selected, _settings.Theme.Glow),
         };
     }

@@ -47,6 +47,10 @@ public partial class NotchWindow : Window
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
 
         Body.MouseLeftButtonDown += OnBodyMouseDown;
+        Body.AllowDrop = true;
+        Body.DragEnter += OnBodyDragOver;
+        Body.DragOver += OnBodyDragOver;
+        Body.Drop += OnBodyDrop;
         AddHandler(ContextMenu.OpenedEvent, new RoutedEventHandler((_, _) => _openMenus++));
         AddHandler(ContextMenu.ClosedEvent, new RoutedEventHandler((_, _) => _openMenus = Math.Max(0, _openMenus - 1)));
         KeyDown += OnKeyDown;
@@ -257,6 +261,24 @@ public partial class NotchWindow : Window
     {
         if (_state.IsExpanded) return;
         _state.Open();
+        e.Handled = true;
+    }
+
+    /// Dragging files onto the closed pill opens the Shelf, like the Mac notch. Once open, the Shelf
+    /// handles drops itself; anywhere else in the panel takes them only while the Shelf is on screen.
+    private void OnBodyDragOver(object sender, DragEventArgs e)
+    {
+        var shelf = _settings.HasCompletedOnboarding && _settings.IsEnabled(ModuleId.Shelf)
+                    && e.Data.GetDataPresent(DataFormats.FileDrop);
+        if (shelf && !_state.IsExpanded) _state.Open(ModuleId.Shelf);
+        e.Effects = shelf && _state.Selected == ModuleId.Shelf && !_state.ShowSettings ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnBodyDrop(object sender, DragEventArgs e)
+    {
+        if (_settings.HasCompletedOnboarding && _state.Selected == ModuleId.Shelf && !_state.ShowSettings)
+            Features.Shelf.ShelfStore.Shared.Add(FileMeta.DroppedPaths(e.Data));
         e.Handled = true;
     }
 
