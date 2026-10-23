@@ -254,8 +254,12 @@ public sealed class UnitsModule : DockPanel
             stack.Children.Add(from);
 
             var text = UnitCatalog.Format(ConvertTo(value, ToUnit));
-            var number = Ui.Text(text, 38, ThemeResources.Accent, FontWeights.Bold).Tabular();
-            number.TextWrapping = TextWrapping.NoWrap;
+            // Selectable like the Mac's .textSelection(.enabled), and still copied whole by a plain click.
+            var number = Ui.Input(text, 38, weight: FontWeights.Bold);
+            number.IsReadOnly = true;
+            number.IsReadOnlyCaretVisible = false;
+            number.SetResourceReference(Control.ForegroundProperty, ThemeResources.Accent);
+            System.Windows.Documents.Typography.SetNumeralAlignment(number, FontNumeralAlignment.Tabular);
             if (AppSettings.Shared.Theme.Glow && TryFindResource(ThemeResources.Accent) is SolidColorBrush accent)
                 number.Effect = ExpandedView.Glow(accent.Color, 4);
             var symbol = Ui.Text(ToUnit.Symbol, 16, ThemeResources.SecondaryText, FontWeights.SemiBold);
@@ -274,7 +278,7 @@ public sealed class UnitsModule : DockPanel
                 StretchDirection = StretchDirection.DownOnly,
                 HorizontalAlignment = HorizontalAlignment.Left,
             };
-            stack.Children.Add(CopyOnClick(fit, text));
+            stack.Children.Add(CopyOnClick(fit, text, number));
         }
         else
         {
@@ -345,12 +349,16 @@ public sealed class UnitsModule : DockPanel
         return stack;
     }
 
-    private static FrameworkElement CopyOnClick(FrameworkElement element, string text)
+    /// <paramref name="selectable"/>: text inside that can be selected; dragging across it selects
+    /// instead of copying everything.
+    private static FrameworkElement CopyOnClick(FrameworkElement element, string text, TextBox? selectable = null)
     {
         element.Cursor = Cursors.Hand;
         element.ToolTip = "Click to copy";
-        element.MouseLeftButtonUp += (_, _) =>
+        // Preview: a text box keeps the plain button-up event to itself.
+        element.PreviewMouseLeftButtonUp += (_, _) =>
         {
+            if (selectable is { SelectionLength: > 0 }) return;
             try { System.Windows.Clipboard.SetText(text); }
             catch (System.Runtime.InteropServices.ExternalException) { }
         };

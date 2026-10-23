@@ -188,7 +188,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Typing "5 km to mi", "100 f in c" or "2 cups -> ml" switches the category and both units by itself and shows the result in large accent digits. A bare "5" converts with the units already picked.
 - [ ] The category chips along the top (scroll them sideways with the wheel) switch to that category's usual pair, for example Bars and PSI for Pressure. Every chip has an icon (Volume's is a drawn drop).
 - [ ] The two unit menus list "Kilometers (km)" and so on, and swap exchanges them. The category and units are the same after reopening Purrch.
-- [ ] The right card lists the value in every unit of the category; the target unit is in the accent colour and the source row is shaded. Clicking a row or the big result copies the number.
+- [ ] The right card lists the value in every unit of the category; the target unit is in the accent colour and the source row is shaded. Clicking a row or the big result copies the number. Dragging across the big result selects part of it instead (Ctrl+C copies the selection).
 - [ ] Very long results shrink to fit instead of being cut off; huge and tiny values show as 1.235e+15.
 
 **Links**
