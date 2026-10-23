@@ -61,6 +61,17 @@ dotnet run --project src\Purrch
 
 `dotnet run` makes a Debug build. Debug builds never add themselves to startup, so your startup list doesn't get a path inside `bin\Debug`.
 
+### Open Purrch from a script or shortcut
+
+Running `Purrch.exe` again with a word hands it to the copy that is already running, like the Mac app's script hook:
+
+| Command | What it does |
+| --- | --- |
+| `Purrch.exe` | Opens the panel |
+| `Purrch.exe timers` (any module: `home`, `clipboard`, `weather`, …) | Opens the panel on that module |
+| `Purrch.exe settings` | Opens Settings |
+| `Purrch.exe close` | Closes the panel, even when pinned |
+
 ## What to test on Windows
 
 None of this has run on a real Windows machine yet. Please go through the list and report anything that is off, with a screenshot if you can, and include `%APPDATA%\Purrch\purrch.log` if something crashed.
