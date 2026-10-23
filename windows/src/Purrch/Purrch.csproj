@@ -34,10 +34,13 @@
   <ItemGroup>
     <Resource Include="Assets\Mascot.png" />
     <Resource Include="Assets\Tray.ico" />
+    <!-- Made by windows/tools/make-emoji-catalog.sh from the Mac app's emoji list. -->
+    <EmbeddedResource Include="Assets\Emoji.tsv" LogicalName="Purrch.Emoji.tsv" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Anthropic" Version="13.1.0" />
+    <PackageReference Include="Emoji.Wpf" Version="0.3.4" />
   </ItemGroup>
 
 </Project>
