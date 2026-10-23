@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using Purrch.Core;
 using Purrch.DesignSystem;
 using Purrch.Interface;
@@ -27,7 +28,10 @@ public sealed class SystemModule : Grid
     private readonly Sparkline _upLine = new() { Filled = false, Colour = ThemeResources.SecondaryText };
     private readonly ContentControl _batteryBody = new();
     private readonly TextBlock _batteryState = Ui.Text("", 11, ThemeResources.SecondaryText);
+    private readonly TextBlock _batteryIcon = Ui.Glyph("\uE83F", 10.5, ThemeResources.Accent);
     private readonly TextBlock _uptime = Ui.Text("", 15, weight: FontWeights.SemiBold).Tabular();
+    private readonly Ellipse _thermalDot = new() { Width = 7, Height = 7, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _thermal = Value("");
 
     public SystemModule()
     {
@@ -47,7 +51,7 @@ public sealed class SystemModule : Grid
         bottom.ColumnDefinitions.Add(new ColumnDefinition());
         bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
         bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(230) });
-        Place(bottom, new Card("Battery", "\uE83F", _batteryBody, _batteryState), 0);
+        Place(bottom, new Card("Battery", _batteryIcon, _batteryBody, _batteryState), 0);
         Place(bottom, MachineCard(), 2);
         SetRow(bottom, 2);
         Children.Add(bottom);
@@ -136,8 +140,17 @@ public sealed class SystemModule : Grid
     {
         var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         stack.Children.Add(Pair("Uptime", _uptime));
+        var thermal = new StackPanel { Orientation = Orientation.Horizontal };
+        thermal.Children.Add(_thermalDot);
+        thermal.Children.Add(_thermal);
+        var thermalRow = Pair("Thermal", thermal);
+        // Windows doesn't tell apps how hot the machine is, unlike macOS.
+        thermalRow.ToolTip = "Estimated from CPU throttling: how far the processor is held below its top speed";
+        stack.Children.Add(thermalRow);
         stack.Children.Add(Pair("System", Value(SystemFormat.WindowsVersion())));
-        stack.Children.Add(Pair("Name", Value(Environment.MachineName)));
+        var name = Pair("Name", Value(Environment.MachineName));
+        name.Margin = new Thickness(0);
+        stack.Children.Add(name);
         return new Card("Machine", "\uE7F4", stack);
     }
 
@@ -149,9 +162,9 @@ public sealed class SystemModule : Grid
         return value;
     }
 
-    private static UIElement Pair(string label, TextBlock value)
+    private static FrameworkElement Pair(string label, FrameworkElement value)
     {
-        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
+        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 7), Background = Brushes.Transparent };
         var name = Ui.Text(label, 12, ThemeResources.SecondaryText);
         name.Margin = new Thickness(0, 0, 10, 0);
         DockPanel.SetDock(name, Dock.Left);
@@ -176,6 +189,9 @@ public sealed class SystemModule : Grid
         _downLine.Set(m.NetDownHistory, peak);
         _upLine.Set(m.NetUpHistory, peak);
         _uptime.Text = SystemFormat.Uptime(m.Uptime);
+        var (thermal, dot) = SystemFormat.Thermal(m.Thermal);
+        _thermal.Text = thermal;
+        _thermalDot.Fill = dot.Brush();
         RefreshBattery(m.Battery);
     }
 
@@ -184,6 +200,7 @@ public sealed class SystemModule : Grid
         if (!b.Present)
         {
             _batteryState.Text = "";
+            _batteryIcon.Text = "\uE83F";
             if (_batteryBody.Content is not FrameworkElement { Tag: "none" })
             {
                 var empty = (FrameworkElement)Ui.EmptyState("\uE83E", "No battery", "This PC runs on mains power");
@@ -193,6 +210,7 @@ public sealed class SystemModule : Grid
             return;
         }
         _batteryState.Text = b.IsCharging ? "Charging" : b.OnAC ? "Plugged in" : "On battery";
+        _batteryIcon.Text = b.Glyph;
 
         var row = new DockPanel { VerticalAlignment = VerticalAlignment.Center };
         var percent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -207,17 +225,20 @@ public sealed class SystemModule : Grid
         var track = new Border { CornerRadius = new CornerRadius(7) };
         track.SetResourceReference(Border.BackgroundProperty, ThemeResources.Fill);
         var fill = new Border { CornerRadius = new CornerRadius(7), Width = 120 * Math.Clamp(b.Level, 0, 1), HorizontalAlignment = HorizontalAlignment.Left };
-        if (b.IsCharging) fill.Background = Green.Brush();
-        else if (b.Level < 0.2) fill.Background = Red.Brush();
-        else fill.SetResourceReference(Border.BackgroundProperty, ThemeResources.Accent);
+        var tint = b.IsCharging ? Green
+            : b.Level < 0.2 ? Red
+            : ((SolidColorBrush)FindResource(ThemeResources.Accent)).Color;
+        fill.Background = tint.Brush();
+        if (AppSettings.Shared.Theme.Glow) fill.Effect = ExpandedView.Glow(tint, 4);
         bar.Children.Add(track);
         bar.Children.Add(fill);
         DockPanel.SetDock(bar, Dock.Left);
         row.Children.Add(bar);
 
         var stats = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        stats.Children.Add(Stat("Cycles", b.CycleCount is { } c ? $"{c}" : "—"));
         stats.Children.Add(Stat("Health", b.Health is { } h ? $"{Math.Round(h * 100)}%" : "—"));
-        stats.Children.Add(Stat("Remaining", b.MinutesRemaining is { } m ? $"{m / 60}:{m % 60:00}" : "—"));
+        stats.Children.Add(Stat(b.IsCharging ? "To full" : "Remaining", b.MinutesRemaining is { } m ? $"{m / 60}:{m % 60:00}" : "—"));
         row.Children.Add(stats);
         _batteryBody.Content = row;
     }

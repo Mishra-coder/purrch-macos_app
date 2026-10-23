@@ -147,7 +147,10 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] CPU load and its 60-second chart match Task Manager → Performance roughly. Memory, and free space on the Windows drive, match too.
 - [ ] Downloading something large shows the download rate and the chart rising.
 - [ ] On a laptop: battery %, Charging / Plugged in / On battery, health and time remaining look right; unplugging updates within a second or two. On a desktop or VM it says "No battery".
-- [ ] Machine shows uptime, the Windows version and the PC name.
+- [ ] The Battery card's icon follows the level and shows a bolt while charging. In Molten, Tech HUD and Blood Moon the battery bar glows.
+- [ ] Cycles matches `powercfg /batteryreport` ("Cycle count"), or shows "—" when the battery doesn't report one. It is read once a minute, so the module doesn't stutter.
+- [ ] While charging the last stat says "To full" with a time that shrinks as it charges; on battery it says "Remaining".
+- [ ] Machine shows uptime, Thermal, the Windows version and the PC name. Thermal says Nominal with a green dot normally; under a long full-load run on a hot laptop it may say Fair (yellow) or Serious (orange). Its tooltip says it's estimated from CPU throttling. If Windows won't say, it shows "Normal" with a grey dot.
 
 **Assistant**
 
@@ -367,6 +370,8 @@ How it maps to the Mac app:
 - The exe is not code-signed, so SmartScreen warns on first run.
 - Calendar reads iCal links and .ics files, so it shows events but can't change them, and a published link can lag Google or Outlook by a few hours. Windows' own calendar store needs a packaged (MSIX) app.
 - Screen Time counts the app in front, so a window you are only reading or watching counts until the 2-minute idle limit, as on the Mac. Apps are grouped by exe name, so two different `python.exe` show as one.
+- Windows doesn't tell apps how hot the machine is, so System's **Thermal** row is estimated from CPU throttling (how far the processor's speed limit, or its speed under load, sits below its maximum). It never says Critical, and a PC that throttles for power rather than heat shows the same.
+- The battery cycle count comes from the battery driver through WMI; many drivers don't keep one, and then it shows "—".
 - Claude Code reads only `%USERPROFILE%\.claude\projects`, as the Mac app reads `~/.claude/projects`; a `CLAUDE_CONFIG_DIR` set elsewhere isn't followed. A transcript line still being written is counted on the next read, a minute later.
 - Revenue counts charges in the one currency set in Settings, and reads at most 500 charges from the last seven days, as the Mac app does.
 - Analytics uses Plausible's Stats API v1, the same as the Mac app. "Live" is Plausible's realtime count of visitors in the last 5 minutes.

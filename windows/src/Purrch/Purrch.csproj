@@ -42,6 +42,8 @@
     <PackageReference Include="Anthropic" Version="13.1.0" />
     <PackageReference Include="Emoji.Wpf" Version="0.3.4" />
     <PackageReference Include="Ical.Net" Version="5.2.3" />
+    <!-- WMI, for the battery cycle count on the System page. -->
+    <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
 
 </Project>
