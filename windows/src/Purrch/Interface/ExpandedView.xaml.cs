@@ -172,6 +172,8 @@ public partial class ExpandedView : UserControl
             ModuleId.Emoji => new Features.Emoji.EmojiModule(),
             ModuleId.Units => new Features.Units.UnitsModule(),
             ModuleId.Links => new Features.Links.LinksModule(),
+            ModuleId.Converter => new Features.Converter.ConverterModule(),
+            ModuleId.Downloads => new Features.Downloads.DownloadsModule(),
             ModuleId.NowPlaying => new Features.Media.NowPlayingModule(),
             ModuleId.Message => new Features.Media.MessageModule(),
             ModuleId.Ambience => new Features.Media.AmbienceModule(),

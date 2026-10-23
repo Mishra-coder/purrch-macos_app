@@ -182,6 +182,27 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] **Select** lets you click several captures, then Copy or Delete them together; Select all / Deselect all work.
 - [ ] With no Screenshots folder at all, the tab says "No screenshots yet" and doesn't crash; **Open folder** opens Pictures instead.
 
+**File Converter**
+
+- [ ] Clicking the dashed box opens a file picker; choosing several images shows them as thumbnails, with an x on each and **Clear**. The panel stays open while the picker is up.
+- [ ] With the panel pinned, dragging images from File Explorer onto the box highlights it and adds them. Non-image files are ignored.
+- [ ] Convert to JPEG, PNG, TIFF, BMP, GIF and PDF. Each result lands next to the original as `name-converted.ext` (`name-converted 2.ext` the second time), and opens in Photos. Several images to PDF make one `name-combined.pdf`, one page per image.
+- [ ] The quality slider changes JPEG and PDF size; it greys out for PNG, TIFF and BMP ("Lossless") and GIF ("256 colours"). Max size 1280 makes the longer side 1280 pixels; small images are never enlarged.
+- [ ] A PNG with transparency converted to JPEG has a white background, not black. A phone photo taken in portrait stays upright.
+- [ ] Each result shows before and after sizes with a green "-x%" (or orange "+x%"). **Show in folder** selects the file in File Explorer; dragging a result into a chat or folder drops the file.
+- [ ] A HEIC or WebP file converts if Microsoft's HEIF or Webp Image Extensions are installed, and otherwise shows a clear message instead of failing silently. A renamed text file shows "Couldn't read image".
+- [ ] Format, max size and quality are remembered after restarting Purrch.
+
+**Downloads**
+
+- [ ] The list shows the 20 newest files in your Downloads folder, also when it has been moved to another drive (File Explorer, Downloads, Properties, Location).
+- [ ] Download a big file in Chrome, Edge and Firefox. A "Downloading" row appears within a second with size so far, speed and a moving bar; the closed pill shows a download icon on the left and a filling ring on the right. Two at once show "2 downloads" in the pill.
+- [ ] When it finishes, the ring fills for about three seconds, and the file appears under "Just finished" or with a green DONE tag in "Recent". Cancelling a download removes its row without a DONE tag.
+- [ ] Firefox: no empty duplicate of the file shows in "Recent" while it downloads.
+- [ ] Image rows show a thumbnail and a copy button (Ctrl+V then pastes the picture into Paint or a chat, or the file into a folder); other files show their File Explorer icon. Show in File Explorer, Open and the bin work. Right-click shows the same.
+- [ ] The bin, or **Select** then **Delete**, moves files to the Recycle Bin after a few seconds; **Undo** in that time keeps them. Quitting Purrch during those seconds still recycles them.
+- [ ] With a timer running, the pill shows the timer instead of the download; with music playing, the download wins.
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -204,6 +225,9 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Ambience volumes | `%APPDATA%\Purrch\ambience.json` |
 | Shelf (paths only; the files stay where they are) | `%APPDATA%\Purrch\shelf.json` |
 | Captures (read from, nothing saved) | Pictures → Screenshots, Videos → Screen Recordings, Videos → Captures |
+| File Converter format, max size and quality | `%APPDATA%\Purrch\converter.json` |
+| Converted images | Next to the originals, as `name-converted.ext` |
+| Downloads | Nothing stored; it reads your Downloads folder. Deleted files go to the Recycle Bin |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |
@@ -240,5 +264,7 @@ How it maps to the Mac app:
 
 - The pill always sits on the primary screen.
 - Clicking inside the open panel makes Purrch the active window. When the panel closes, keyboard focus goes back to the app you were in.
-- The closed pill shows running timers. Music and downloads come with Now Playing (step 5) and Downloads.
+- The closed pill shows a message first, then a running timer, then a download, then music.
+- Chrome, Edge and Firefox don't write the expected size of a download next to the file, so download progress is estimated (as it is for Chrome on the Mac) and the percentage shows as "…".
+- Dragging files onto the closed pill opens the Shelf. To drop images on the File Converter, pin the panel first: pressing the mouse in File Explorer to start the drag closes an unpinned panel.
 - The exe is not code-signed, so SmartScreen warns on first run.

@@ -1,4 +1,5 @@
 using Purrch.Features.Clipboard;
+using Purrch.Features.Downloads;
 using Purrch.Features.Media;
 using Purrch.Features.Notes;
 using Purrch.Features.Timers;
@@ -12,6 +13,8 @@ public static class BackgroundServices
     {
         _ = MessageService.Shared;
         _ = TimerService.Shared;
+        // Registers its live activity after timers and before music, so the pill prefers them in that order.
+        DownloadsService.Shared.Start();
         ClipboardService.Shared.Start();
         NowPlayingService.Shared.Start();
     }
@@ -23,5 +26,6 @@ public static class BackgroundServices
         ScratchpadStore.Shared.Flush();
         MessageService.Shared.Flush();
         AmbienceEngine.Shutdown();
+        DownloadsService.Shared.Flush();
     }
 }
