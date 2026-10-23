@@ -171,7 +171,11 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Typing "kal milte hain yaar" with "Detect language" translates it to English after a short pause and shows "Detected: Hinglish". Changing the target language translates again.
 - [ ] Swap (with a fixed source language) swaps the languages and moves the translation into the input.
 - [ ] Fix grammar, Improve, Tone (with a tone menu) and Shorten run on the button or Ctrl+Enter; changed words are highlighted and Accept puts the result in the input. Copy and Clear work.
-- [ ] The provider capsule can use a different provider from the Assistant; a missing key shows where to add it.
+- [ ] Ctrl+Enter also runs after clicking into the result pane or on the header, not only in the input.
+- [ ] Part of a result can be selected and copied with Ctrl+C, and the changed-word highlighting stays.
+- [ ] Switching mode fades and slides in the mode's name and its controls (languages, tone menu).
+- [ ] The stats count "Bring fruit, e.g. apples. Mr. Smith paid 3.5 dollars." as 2 sentences.
+- [ ] The provider capsule can use a different provider from the Assistant, including Local; a missing key shows where to add it, and pasting the key in Settings (with Translate still open behind it) brings the panes back straight away.
 
 **Units**
 

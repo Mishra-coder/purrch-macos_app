@@ -20,7 +20,10 @@ public sealed partial class TranslateModule : DockPanel
     private readonly ContentControl _panes = new();
     private readonly TextBox _input;
     private readonly Border _inputPane;
-    private readonly TextBlock _output = new() { FontSize = 14, TextWrapping = TextWrapping.Wrap };
+    private readonly RichTextBox _output = Ui.SelectableText(14);
+    private readonly Paragraph _outputText = new() { Margin = new Thickness(0) };
+    /// Set while a mode switch rebuilds the header, so the new controls fade in.
+    private bool _animateMode;
     private readonly ScrollViewer _outputScroll;
     private readonly TextBlock _stats = Ui.Text("", 11, ThemeResources.SecondaryText, FontWeights.Medium);
     private readonly StackPanel _actions = new() { Orientation = Orientation.Horizontal };
@@ -37,8 +40,8 @@ public sealed partial class TranslateModule : DockPanel
             AutoTranslate();
             RefreshActions();
         };
-        // Ctrl+Enter runs the current mode.
-        _input.PreviewKeyDown += (_, e) =>
+        // Ctrl+Enter runs the current mode from anywhere in the module, the result pane included.
+        PreviewKeyDown += (_, e) =>
         {
             if (e.Key != Key.Enter || !Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) return;
             RunCurrent();
@@ -46,6 +49,7 @@ public sealed partial class TranslateModule : DockPanel
         };
         _inputPane = Pane(Ui.WithPlaceholder(_input, "", new Thickness(2, 0, 0, 0)));
 
+        _output.Document.Blocks.Add(_outputText);
         _outputScroll = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Hidden,
@@ -70,6 +74,7 @@ public sealed partial class TranslateModule : DockPanel
         {
             _store.Changed += OnStoreChanged;
             AppSettings.Shared.PropertyChanged += OnSettingsChanged;
+            SecretStore.Changed += OnSecretChanged;
             RefreshAll();
             _input.Focus();
         };
@@ -77,12 +82,21 @@ public sealed partial class TranslateModule : DockPanel
         {
             _store.Changed -= OnStoreChanged;
             AppSettings.Shared.PropertyChanged -= OnSettingsChanged;
+            SecretStore.Changed -= OnSecretChanged;
         };
     }
 
     private void OnSettingsChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(AppSettings.AiProvider)) RefreshAll();
+    }
+
+    /// A key added in Settings replaces the "needs an API key" screen straight away.
+    private void OnSecretChanged(string name)
+    {
+        if (name != _store.Provider.SecretName()) return;
+        RefreshAll();
+        AutoTranslate();
     }
 
     private void OnStoreChanged()
@@ -137,18 +151,22 @@ public sealed partial class TranslateModule : DockPanel
             item.Click += (_, _) => { _store.Provider = choice; RefreshAll(); AutoTranslate(); };
             providers.Items.Add(item);
         }
-        var providerButton = AssistantModule.Dropdown(provider.Title(), providers);
+        var providerButton = AssistantModule.Dropdown(provider.ShortTitle(), providers);
         DockPanel.SetDock(providerButton, Dock.Right);
         row.Children.Add(providerButton);
 
         var left = new StackPanel { Orientation = Orientation.Horizontal };
         left.Children.Add(ModePicker());
+        // The controls that belong to the mode: languages and swap, or the tone menu.
+        var extras = new StackPanel { Orientation = Orientation.Horizontal };
+        left.Children.Add(extras);
+        if (_animateMode) Appear(extras);
         if (_store.Mode == WritingMode.Translate)
         {
             var sourceLabel = _store.Source == TranslateLanguage.Auto && _store.Detected is { } detected
                 ? $"Detected: {detected}"
                 : _store.Source.Title();
-            left.Children.Add(Spaced(LanguageMenu(sourceLabel, Enum.GetValues<TranslateLanguage>(), _store.Source,
+            extras.Children.Add(Spaced(LanguageMenu(sourceLabel, Enum.GetValues<TranslateLanguage>(), _store.Source,
                 l => _store.Source = l)));
             var swap = Ui.IconButton("\uE8AB", 26, () =>
             {
@@ -160,8 +178,8 @@ public sealed partial class TranslateModule : DockPanel
             }, tooltip: "Swap languages");
             swap.IsEnabled = _store.Source != TranslateLanguage.Auto;
             swap.Opacity = swap.IsEnabled ? 1 : 0.4;
-            left.Children.Add(Spaced(swap));
-            left.Children.Add(Spaced(LanguageMenu(_store.Target.Title(), TranslateInfo.Targets, _store.Target,
+            extras.Children.Add(Spaced(swap));
+            extras.Children.Add(Spaced(LanguageMenu(_store.Target.Title(), TranslateInfo.Targets, _store.Target,
                 l => _store.Target = l)));
         }
         else if (_store.Mode == WritingMode.Tone)
@@ -174,7 +192,7 @@ public sealed partial class TranslateModule : DockPanel
                 item.Click += (_, _) => { _store.Tone = choice; RefreshHeader(); };
                 tones.Items.Add(item);
             }
-            left.Children.Add(Spaced(AssistantModule.Dropdown(_store.Tone.ToString(), tones, dot: false)));
+            extras.Children.Add(Spaced(AssistantModule.Dropdown(_store.Tone.ToString(), tones, dot: false)));
         }
         row.Children.Add(left);
         _header.Content = row;
@@ -220,6 +238,7 @@ public sealed partial class TranslateModule : DockPanel
                 var title = Ui.Text(mode.Title(), 11, ThemeResources.Background, FontWeights.SemiBold);
                 title.Margin = new Thickness(5, 0, 0, 0);
                 content.Children.Add(title);
+                if (_animateMode) Appear(title);
             }
             var pill = new Border { CornerRadius = new CornerRadius(12), Padding = new Thickness(9, 5, 9, 5), Child = content };
             if (active) pill.SetResourceReference(Border.BackgroundProperty, ThemeResources.Accent);
@@ -229,13 +248,26 @@ public sealed partial class TranslateModule : DockPanel
             {
                 if (_store.Mode == choice) return;
                 _store.Mode = choice;
+                _animateMode = true;
                 RefreshAll();
+                _animateMode = false;
                 AutoTranslate();
             }, mode.Title()));
         }
         var capsule = new Border { CornerRadius = new CornerRadius(14), Padding = new Thickness(2), Child = row };
         capsule.SetResourceReference(Border.BackgroundProperty, ThemeResources.Hairline);
         return capsule;
+    }
+
+    /// Fades and slides an element in, like the Mac's expo-out mode switch.
+    private static void Appear(UIElement element)
+    {
+        var curve = Motion.ExpoOut(0.3);
+        var slide = new TranslateTransform(-6, 0);
+        element.RenderTransform = slide;
+        element.Opacity = 0;
+        element.Animate(OpacityProperty, 1, curve);
+        slide.Animate(TranslateTransform.XProperty, 0, curve);
     }
 
     // MARK: - Panes
@@ -248,7 +280,7 @@ public sealed partial class TranslateModule : DockPanel
             _panes.Content = Ui.EmptyState("\uE8D7", $"{provider.Title()} needs an API key",
                 provider == AiProvider.Gemini
                     ? "Get a free key at aistudio.google.com/apikey, then paste it in Settings → AI."
-                    : "Add your key in Settings → AI, or switch to another provider.");
+                    : "Add your key in Settings → AI, or switch to Local (on-device) or another provider.");
             return;
         }
         if (_inputPane.Child is Grid withHint && withHint.Children[1] is TextBlock hint)
@@ -285,25 +317,27 @@ public sealed partial class TranslateModule : DockPanel
 
     private void RefreshOutput()
     {
-        _output.Inlines.Clear();
+        // The result is selectable; so are the placeholder and error lines, which is harmless.
+        var inlines = _outputText.Inlines;
+        inlines.Clear();
         _output.Opacity = _store.IsBusy && _store.Output.Length > 0 ? 0.5 : 1;
         if (_store.Error is { } error)
         {
-            _output.Inlines.Add(new Run("⚠ " + error));
-            _output.SetResourceReference(TextBlock.ForegroundProperty, ThemeResources.SecondaryText);
+            inlines.Add(new Run("⚠ " + error));
+            _output.SetResourceReference(Control.ForegroundProperty, ThemeResources.SecondaryText);
             return;
         }
         if (_store.Output.Length == 0)
         {
-            _output.Inlines.Add(new Run(_store.IsBusy ? _store.Mode.BusyTitle()
+            inlines.Add(new Run(_store.IsBusy ? _store.Mode.BusyTitle()
                 : _store.Mode == WritingMode.Translate ? "Translation appears here." : "Corrected text appears here."));
-            _output.SetResourceReference(TextBlock.ForegroundProperty, ThemeResources.SecondaryText);
+            _output.SetResourceReference(Control.ForegroundProperty, ThemeResources.SecondaryText);
             return;
         }
-        _output.SetResourceReference(TextBlock.ForegroundProperty, ThemeResources.Text);
+        _output.SetResourceReference(Control.ForegroundProperty, ThemeResources.Text);
         if (_store.OutputMode == WritingMode.Translate)
         {
-            _output.Inlines.Add(new Run(_store.Output));
+            inlines.Add(new Run(_store.Output));
             return;
         }
         // Words that differ from the original are highlighted, like Grammarly's underlines.
@@ -316,8 +350,8 @@ public sealed partial class TranslateModule : DockPanel
                 run.Background = accent.WithOpacity(0.25).Brush();
                 run.TextDecorations = TextDecorations.Underline;
             }
-            _output.Inlines.Add(run);
-            if (space.Length > 0) _output.Inlines.Add(new Run(space));
+            inlines.Add(run);
+            if (space.Length > 0) inlines.Add(new Run(space));
         }
     }
 
@@ -354,15 +388,32 @@ public sealed partial class TranslateModule : DockPanel
         timer.Start();
     }
 
-    [GeneratedRegex(@"[^.!?।]+[.!?।]+|[^.!?।]+$")]
-    private static partial Regex Sentence();
+    /// Where a sentence ends: . ! ? or the Hindi danda, then (after any closing quote or bracket) a space or the end.
+    /// Dots inside "3.5" or "e.g." aren't followed by a space; common abbreviations ("Mr.", "e.g.", "vs.")
+    /// and single initials ("J. Smith", "U.S.") don't count either.
+    [GeneratedRegex(@"(?<!\b(?i:e\.g|i\.e|mr|mrs|ms|dr|prof|sr|jr|st|vs|approx|et al)|\b[A-Z])[.!?।]+(?=[""'”’)\]]*(?:\s|$))")]
+    private static partial Regex SentenceEnd();
+
+    /// Pieces of text with something in them between sentence ends, plus any unfinished last sentence.
+    private static int CountSentences(string text)
+    {
+        var count = 0;
+        var start = 0;
+        foreach (Match end in SentenceEnd().Matches(text))
+        {
+            if (text[start..end.Index].Trim().Length > 0) count++;
+            start = end.Index + end.Length;
+        }
+        if (text[start..].Trim().Length > 0) count++;
+        return count;
+    }
 
     /// Word and sentence counts plus reading time at 238 words a minute, like Grammarly's stats.
     private void UpdateStats()
     {
         var text = _store.Input;
         var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
-        var sentences = Sentence().Matches(text).Count(m => m.Value.Trim().Length > 0);
+        var sentences = CountSentences(text);
         var seconds = (int)Math.Round(words / 238.0 * 60);
         var reading = seconds < 60 ? $"{seconds}s" : $"{seconds / 60}m {seconds % 60}s";
         _stats.Text = $"{words} words · {sentences} sent. · {reading}";
