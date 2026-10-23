@@ -230,6 +230,8 @@ public sealed class SettingsView : Grid
         Add(Plain("City (blank = use location)", _settings.WeatherCity, v => _settings.WeatherCity = v));
         Add(Toggle("Fahrenheit", "", _settings.UseFahrenheit, v => _settings.UseFahrenheit = v));
 
+        BuildCalendarAccounts();
+
         Add(Heading("Revenue (Stripe)"));
         Add(Secret("Restricted read-only key (rk_...)", Features.Revenue.RevenueService.SecretName));
         Add(Plain("Currency (usd, eur, inr...)", _settings.RevenueCurrency, v => _settings.RevenueCurrency = v));
@@ -238,6 +240,38 @@ public sealed class SettingsView : Grid
         Add(Secret("Plausible API key", Features.Analytics.AnalyticsService.SecretName));
         Add(Plain("Site domain (example.com)", _settings.PlausibleSite, v => _settings.PlausibleSite = v));
         Add(Plain("Host (for self-hosted Plausible)", _settings.PlausibleHost, v => _settings.PlausibleHost = v));
+    }
+
+    /// Microsoft and Google sign-in for Calendar, with the user's own app registrations.
+    private void BuildCalendarAccounts()
+    {
+        var service = Features.Calendar.CalendarService.Shared;
+        Add(Heading("Calendar (Microsoft and Google)"));
+        Add(Ui.Text("Purrch reads your calendars and tasks through an app you register yourself, so no one else's " +
+                    "app sees them. Sign-ins are kept on this PC only. iCal links and .ics files are added in Calendar.",
+                    11, ThemeResources.SecondaryText));
+
+        Add(Help("Microsoft: portal.azure.com → App registrations → New registration. Supported account types: " +
+                 "\u201CAccounts in any organizational directory and personal Microsoft accounts\u201D. Redirect URI: " +
+                 "\u201CPublic client/native (mobile & desktop)\u201D, http://localhost. Then API permissions → Add a permission → " +
+                 "Microsoft Graph → Delegated: Calendars.Read, Tasks.ReadWrite, offline_access, User.Read. " +
+                 "Paste the Application (client) ID from Overview here."));
+        Add(Plain("Microsoft client ID", _settings.MicrosoftClientId, v => _settings.MicrosoftClientId = v));
+        Add(Ui.Row(new Features.Calendar.AccountRow(service, service.Accounts.First(a => a.Kind == Features.Calendar.AccountKind.Microsoft), compact: false)));
+
+        Add(Help("Google: console.cloud.google.com → new project → APIs & Services → Library: enable Google Calendar API " +
+                 "and Google Tasks API. OAuth consent screen: External, and add your address as a test user. Credentials → " +
+                 "Create credentials → OAuth client ID → Desktop app. Paste its client ID and secret here."));
+        Add(Plain("Google client ID", _settings.GoogleClientId, v => _settings.GoogleClientId = v));
+        Add(Secret("Google client secret", Features.Calendar.GoogleAccount.SecretName));
+        Add(Ui.Row(new Features.Calendar.AccountRow(service, service.Accounts.First(a => a.Kind == Features.Calendar.AccountKind.Google), compact: false)));
+    }
+
+    private static TextBlock Help(string text)
+    {
+        var help = Ui.Text(text, 11, ThemeResources.SecondaryText);
+        help.Opacity = 0.85;
+        return help;
     }
 
     /// A plain text field. Commits a moment after typing stops, so each key doesn't start a new lookup.

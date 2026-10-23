@@ -44,7 +44,7 @@ bash dotnet-install.sh --channel 8.0 --install-dir ~/.dotnet
   -p:EnableCompressionInSingleFile=true -o windows/publish/win-x64
 ```
 
-This writes one `Purrch.exe` (about 79 MB, with .NET included) to `windows/publish/win-x64`. Use `-r win-arm64` instead for Windows on ARM, for example Windows 11 in Parallels or UTM on an Apple Silicon Mac.
+This writes one `Purrch.exe` (about 84 MB, with .NET included) to `windows/publish/win-x64`. Use `-r win-arm64` instead for Windows on ARM, for example Windows 11 in Parallels or UTM on an Apple Silicon Mac.
 
 1. Copy `Purrch.exe` to the PC, for example into `C:\Users\<you>\Apps\Purrch\`. Keep it in that folder, because launch at startup remembers this path.
 2. Double-click it. The exe is not signed yet, so SmartScreen will say "Windows protected your PC". Click **More info**, then **Run anyway**.
@@ -276,6 +276,25 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Reminders: typing in "Add a reminder" and pressing Enter adds one. Clicking its ring fills it, strikes the title through and the row goes. To-dos in an .ics file (VTODO) show with their due time, red once overdue.
 - [ ] Removing a calendar (bin icon) removes its events at once. Everything is still there after quitting and reopening Purrch.
 
+**Calendar: Microsoft and Google accounts**
+
+Purrch has no client IDs of its own, so register one app with each provider first (both are free):
+
+- Microsoft: [portal.azure.com](https://portal.azure.com) → **App registrations** → **New registration**. Any name; **Supported account types**: "Accounts in any organizational directory and personal Microsoft accounts"; **Redirect URI**: platform "Public client/native (mobile & desktop)", `http://localhost`. Then **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions**: `Calendars.Read`, `Tasks.ReadWrite`, `offline_access`, `User.Read`. Copy the **Application (client) ID** from **Overview**. No client secret is needed.
+- Google: [console.cloud.google.com](https://console.cloud.google.com) → create a project → **APIs & Services** → **Library**: enable **Google Calendar API** and **Google Tasks API**. **OAuth consent screen**: External, fill in the app name and your email, and add your Google address under **Test users**. **Credentials** → **Create credentials** → **OAuth client ID** → application type **Desktop app**. Copy the client ID and the client secret.
+
+- [ ] Settings → Integrations → Calendar shows the steps above, **Microsoft client ID**, **Google client ID** and **Google client secret**, each with a **Sign in** button. With no client ID, the row says "Add your Microsoft client ID in Settings → Integrations." A Microsoft ID that isn't a GUID, or a Google ID not ending in `.apps.googleusercontent.com`, says so.
+- [ ] **Sign in** next to Microsoft opens the default browser on Microsoft's sign-in page; the row says "Finish signing in in your browser…" with **Cancel**. After signing in (a personal outlook.com account and a work or school account both work), the browser says "Signed in to Purrch" and the row shows "Microsoft · you@outlook.com" with "3 calendars, 2 task lists" and **Sign out**. `%APPDATA%\Purrch\msal.cache` exists and is not readable text.
+- [ ] **Sign in** next to Google does the same through Google's page (click through "Google hasn't verified this app", then allow calendar and tasks). The row shows the Google address. Credential Manager has `Purrch:google-client-secret` and `Purrch:google-refresh-token`.
+- [ ] The Calendars card (gear icon in Calendar, or **Add calendar**) lists Microsoft and Google with the account, then each calendar and task list in its own colour with a switch; task lists say "Tasks". Turning a calendar off removes its events from the agenda at once, and it stays off after a restart. iCal calendars are still listed below.
+- [ ] "Next 7 days" shows account events with iCal events, sorted together, with each calendar's colour bar, the right times (also for an event created in another time zone), all-day events as "All day", and the location pin. A recurring Outlook or Google meeting shows each occurrence; a cancelled occurrence doesn't show.
+- [ ] Reminders lists open To Do tasks and Google Tasks in their list's colour with the due day ("Today", "Tomorrow", "Fri 24 Oct"), red once the day has passed, sorted with .ics to-dos by due date. Ticking one strikes it through, the row goes, and the task is completed in Outlook/To Do or Google Tasks.
+- [ ] Ticking a task with Wi-Fi off: the row goes, then comes back, and a Windows notification says "Reminder not completed" with the reason.
+- [ ] A new event in Outlook or Google Calendar shows within 5 minutes with the Calendar tab open, or straight away when the panel is opened a minute or more after the last read. Home's event chip shows account events too, and with only an account signed in it no longer says "Connect".
+- [ ] Turn off Wi-Fi and reopen Purrch: account events stay, and the account row says "Offline: showing the last copy".
+- [ ] Errors are shown in the account row: declining consent says "Sign-in was declined…"; a made-up Microsoft client ID says "Microsoft doesn't know this client ID…"; a wrong Google secret says "Google doesn't accept this client ID or secret…"; Google Tasks API not enabled says "Turn on the Google Tasks API…" while calendars still load; revoking Purrch at account.microsoft.com or myaccount.google.com/permissions says "…expired or was withdrawn. Sign in again." with **Sign in**. Changing a client ID in Settings asks to sign in again.
+- [ ] **Sign out** removes the account's events and calendars at once, deletes `msal.cache` (Microsoft) or the Google refresh token, and Purrch no longer appears at myaccount.google.com/permissions. `purrch.log` contains no tokens or secrets.
+
 **Weather**
 
 - [ ] With location on (Windows Settings → Privacy & security → Location, including "Let desktop apps access your location"), Weather shows your town, the current temperature with a colour icon, the condition, H and L, and Feels, Wind and Humid along the bottom. Windows 11 may ask first whether Purrch can use your location.
@@ -356,17 +375,20 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | File Converter format, max size and quality | `%APPDATA%\Purrch\converter.json` |
 | Converted images | Next to the originals, as `name-converted.ext` |
 | Downloads | Nothing stored; it reads your Downloads folder, and while a Chromium download runs, a copy of the browser's `History` in `%TEMP%` that is deleted straight after. Deleted files go to the Recycle Bin |
-| Calendar links and files, reminders added in Purrch, feed to-dos ticked off | `%APPDATA%\Purrch\calendar.json`, last download of each link in `calendar-cache\` |
+| Calendar links and files, reminders added in Purrch, feed to-dos ticked off, signed-in accounts (email and calendars switched off, no tokens) | `%APPDATA%\Purrch\calendar.json`, last download of each link in `calendar-cache\` |
+| Last read of each Microsoft and Google account (calendars, the week's events, open tasks) | `%APPDATA%\Purrch\calendar-cache\microsoft.json`, `google.json` |
+| Microsoft and Google client IDs | `%APPDATA%\Purrch\settings.json` |
+| Microsoft sign-in (MSAL's token cache, encrypted with DPAPI for your Windows user) | `%APPDATA%\Purrch\msal.cache` |
 | Last weather forecast (city and °F are in `settings.json`) | `%APPDATA%\Purrch\weather.json` |
 | Screen Time: seconds per app per day for the last 7 days, and app names and exe paths | `%APPDATA%\Purrch\screentime.json` |
 | Claude Code (read from, nothing saved) | `%USERPROFILE%\.claude\projects` |
 | Last Stripe figures (the currency is in `settings.json`, the key in Credential Manager) | `%APPDATA%\Purrch\revenue.json` |
 | Last Plausible stats (site and host are in `settings.json`, the key in Credential Manager) | `%APPDATA%\Purrch\analytics.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
-| API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` (`anthropic`, `openai`, `gemini`, `stripe`, `plausible`) |
+| API keys, the Google client secret and Google sign-in | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` (`anthropic`, `openai`, `gemini`, `stripe`, `plausible`, `google-client-secret`, `google-refresh-token`) |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |
 
-To reset Purrch completely, turn off the water reminder in Timers, quit Purrch from the tray, delete `%APPDATA%\Purrch`, and turn off **Purrch** in Task Manager → Startup apps (or delete the Run value).
+To reset Purrch completely, turn off the water reminder in Timers, sign out of Microsoft and Google in Settings → Integrations, quit Purrch from the tray, delete `%APPDATA%\Purrch` and the `Purrch:` entries in Credential Manager, and turn off **Purrch** in Task Manager → Startup apps (or delete the Run value).
 
 ## Project layout
 
@@ -405,7 +427,8 @@ How it maps to the Mac app:
 - Dragging files onto the closed pill opens the Shelf. To drop images on the File Converter, pin the panel first: pressing the mouse in File Explorer to start the drag closes an unpinned panel.
 - The exe is not code-signed, so SmartScreen warns on first run.
 - Water reminders are queued with Windows eight hours ahead, and topped up while Purrch runs. If Purrch isn't started for longer than that, they pause until it runs again.
-- Calendar reads iCal links and .ics files, so it shows events but can't change them, and a published link can lag Google or Outlook by a few hours. Windows' own calendar store needs a packaged (MSIX) app.
+- Calendar reads Microsoft (Outlook calendars and To Do) and Google (Calendar and Tasks) accounts with client IDs you register yourself (see "Calendar: Microsoft and Google accounts" above); Purrch ships none. One account of each kind at a time. Events are read-only, as on the Mac; only ticking off a task writes back. iCal links and .ics files still work alongside, but show events without changing them, and a published link can lag Google or Outlook by a few hours. Windows' own calendar store needs a packaged (MSIX) app.
+- While a Google OAuth consent screen is in **Testing**, Google ends the sign-in after 7 days and Purrch asks to sign in again. **Publish app** on the consent screen keeps it; Google then shows an "unverified app" warning at sign-in, which is fine for your own use.
 - Screen Time counts the app in front, so a window you are only reading or watching counts until the 2-minute idle limit, as on the Mac. Store apps are grouped by their app ID and other apps by the exe's full path. Store apps recorded by an older build stay under their old exe-name entry for the days already recorded.
 - Windows doesn't tell apps how hot the machine is, so System's **Thermal** row is estimated from CPU throttling (how far the processor's speed limit, or its speed under load, sits below its maximum). It never says Critical, and a PC that throttles for power rather than heat shows the same.
 - The battery cycle count comes from the battery driver through WMI; many drivers don't keep one, and then it shows "—".
