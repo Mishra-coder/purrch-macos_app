@@ -132,6 +132,14 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Fix grammar, Improve, Tone (with a tone menu) and Shorten run on the button or Ctrl+Enter; changed words are highlighted and Accept puts the result in the input. Copy and Clear work.
 - [ ] The provider capsule can use a different provider from the Assistant; a missing key shows where to add it.
 
+**Units**
+
+- [ ] Typing "5 km to mi", "100 f in c" or "2 cups -> ml" switches the category and both units by itself and shows the result in large accent digits. A bare "5" converts with the units already picked.
+- [ ] The category chips along the top (scroll them sideways with the wheel) switch to that category's usual pair, for example Bars and PSI for Pressure. Every chip has an icon (Volume's is a drawn drop).
+- [ ] The two unit menus list "Kilometers (km)" and so on, and swap exchanges them. The category and units are the same after reopening Purrch.
+- [ ] The right card lists the value in every unit of the category; the target unit is in the accent colour and the source row is shaded. Clicking a row or the big result copies the number.
+- [ ] Very long results shrink to fit instead of being cut off; huge and tiny values show as 1.235e+15.
+
 **Links**
 
 - [ ] Typing words and pressing Enter searches the engine picked in the capsule (Google, DuckDuckGo, Bing or Perplexity) in the default browser. Typing "github.com" or "localhost:3000" turns the magnifier into a globe and Enter opens that address.
@@ -155,6 +163,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Timer lengths, pomodoros done, water | `%APPDATA%\Purrch\timers.json`, `water.json` |
 | Clipboard history | `%APPDATA%\Purrch\clipboard.json`, images in `clipboard-images\` |
 | Notes, Scratchpad | `%APPDATA%\Purrch\notes.json`, `scratchpad.json` |
+| Units category and the two units picked | `%APPDATA%\Purrch\units.json` |
 | Links: saved sites and search engine | `%APPDATA%\Purrch\links.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
