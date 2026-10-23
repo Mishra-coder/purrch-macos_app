@@ -2,20 +2,26 @@ using System.Windows.Media;
 
 namespace Purrch.Core;
 
-public enum LiveActivityKind { None, Timer, Download, Music }
+public enum LiveActivityKind { None, Message, Timer, Download, Music }
 
-/// What the closed pill shows on either side: a running timer, a download, or music.
+/// What the closed pill shows: a scrolling message across it, or on either side a running timer, a download, or music.
 public sealed record LiveActivity(LiveActivityKind Kind, string Label = "", string Glyph = "", double Progress = 0,
                                   ImageSource? Artwork = null)
 {
     public static LiveActivity None { get; } = new(LiveActivityKind.None);
 
     /// Extra width on each side of the pill while this activity shows.
-    public double Wing => Kind == LiveActivityKind.None ? 0 : 56;
+    public double Wing => Kind switch
+    {
+        LiveActivityKind.None => 0,
+        LiveActivityKind.Message => 110,
+        _ => 56,
+    };
 }
 
-/// Collects live activities from the services that produce them (timers, downloads, media).
-/// Sources are asked in the order they registered; the first one with something to show wins.
+/// Collects live activities from the services that produce them (message, timers, downloads, media).
+/// Sources are asked in the order they registered (ones registered <c>first</c> go ahead of the rest);
+/// the first one with something to show wins.
 public sealed class LiveActivityHub
 {
     public static LiveActivityHub Shared { get; } = new();
@@ -25,9 +31,10 @@ public sealed class LiveActivityHub
     /// Raised when a source's activity may have changed; listeners re-read <see cref="Current"/>.
     public event Action? Changed;
 
-    public void Register(Func<LiveActivity?> source)
+    public void Register(Func<LiveActivity?> source, bool first = false)
     {
-        _sources.Add(source);
+        if (first) _sources.Insert(0, source);
+        else _sources.Add(source);
         Refresh();
     }
 

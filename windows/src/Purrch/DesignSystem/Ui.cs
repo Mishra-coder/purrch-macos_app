@@ -90,8 +90,8 @@ public static class Ui
         return button;
     }
 
-    /// Rounded search box with a magnifier and a placeholder. Calls back on every change.
-    public static Border SearchField(string placeholder, Action<string> changed, out TextBox box)
+    /// Rounded search box with a magnifier (or another glyph) and a placeholder. Calls back on every change.
+    public static Border SearchField(string placeholder, Action<string> changed, out TextBox box, string glyph = "\uE721")
     {
         var input = new TextBox
         {
@@ -118,7 +118,7 @@ public static class Ui
         field.Children.Add(input);
 
         var row = new DockPanel();
-        var glass = Glyph("\uE721", 12, ThemeResources.SecondaryText);
+        var glass = Glyph(glyph, 12, ThemeResources.SecondaryText);
         glass.Margin = new Thickness(0, 0, 8, 0);
         DockPanel.SetDock(glass, Dock.Left);
         row.Children.Add(glass);

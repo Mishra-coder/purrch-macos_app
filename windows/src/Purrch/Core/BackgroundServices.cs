@@ -10,6 +10,7 @@ public static class BackgroundServices
 {
     public static void Start()
     {
+        _ = MessageService.Shared;
         _ = TimerService.Shared;
         ClipboardService.Shared.Start();
         NowPlayingService.Shared.Start();
@@ -20,5 +21,6 @@ public static class BackgroundServices
     {
         NotesStore.Shared.Flush();
         ScratchpadStore.Shared.Flush();
+        MessageService.Shared.Flush();
     }
 }

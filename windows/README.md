@@ -147,6 +147,13 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Hovering a tile outlines it in the accent and shows edit and remove buttons. Right-click offers Open, Copy Link, Edit… and Remove.
 - [ ] + opens "Add site" over the dimmed grid; Add stays disabled until the address looks valid, Enter in the address field saves, and an empty title becomes the host without "www.". Edits and the engine choice are kept after reopening Purrch.
 
+**Message**
+
+- [ ] Typing in the box updates the count (up to 80) and the preview, which scrolls the text in capitals as glowing dots. Clicking a preset fills the box and turns **Show in pill** on.
+- [ ] With **Show in pill** on, the closed pill widens and the message scrolls across it smoothly, also while a timer runs or music plays (the message wins). Hovering the pill doesn't make the text jump back to the start.
+- [ ] Turning it off, or switching off **Live activities** in Settings, brings back the timer or music. With an empty box the switch can't be turned on.
+- [ ] The text and the switch are the same after quitting and reopening Purrch.
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -165,6 +172,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Notes, Scratchpad | `%APPDATA%\Purrch\notes.json`, `scratchpad.json` |
 | Units category and the two units picked | `%APPDATA%\Purrch\units.json` |
 | Links: saved sites and search engine | `%APPDATA%\Purrch\links.json` |
+| Message text and whether it shows | `%APPDATA%\Purrch\message.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |
