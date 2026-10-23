@@ -132,6 +132,13 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Fix grammar, Improve, Tone (with a tone menu) and Shorten run on the button or Ctrl+Enter; changed words are highlighted and Accept puts the result in the input. Copy and Clear work.
 - [ ] The provider capsule can use a different provider from the Assistant; a missing key shows where to add it.
 
+**Links**
+
+- [ ] Typing words and pressing Enter searches the engine picked in the capsule (Google, DuckDuckGo, Bing or Perplexity) in the default browser. Typing "github.com" or "localhost:3000" turns the magnifier into a globe and Enter opens that address.
+- [ ] The six default sites show their favicons; with no internet they show their first letter instead and nothing crashes.
+- [ ] Hovering a tile outlines it in the accent and shows edit and remove buttons. Right-click offers Open, Copy Link, Edit… and Remove.
+- [ ] + opens "Add site" over the dimmed grid; Add stays disabled until the address looks valid, Enter in the address field saves, and an empty title becomes the host without "www.". Edits and the engine choice are kept after reopening Purrch.
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -148,6 +155,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Timer lengths, pomodoros done, water | `%APPDATA%\Purrch\timers.json`, `water.json` |
 | Clipboard history | `%APPDATA%\Purrch\clipboard.json`, images in `clipboard-images\` |
 | Notes, Scratchpad | `%APPDATA%\Purrch\notes.json`, `scratchpad.json` |
+| Links: saved sites and search engine | `%APPDATA%\Purrch\links.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |

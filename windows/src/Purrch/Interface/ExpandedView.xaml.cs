@@ -170,6 +170,7 @@ public partial class ExpandedView : UserControl
             ModuleId.Notes => new Features.Notes.NotesModule(),
             ModuleId.Scratchpad => new Features.Notes.ScratchpadModule(),
             ModuleId.Emoji => new Features.Emoji.EmojiModule(),
+            ModuleId.Links => new Features.Links.LinksModule(),
             ModuleId.NowPlaying => new Features.Media.NowPlayingModule(),
             ModuleId.System => new Features.Insights.SystemModule(),
             ModuleId.Assistant => new Features.Assistant.AssistantModule(),
