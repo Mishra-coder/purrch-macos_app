@@ -203,6 +203,14 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] The bin, or **Select** then **Delete**, moves files to the Recycle Bin after a few seconds; **Undo** in that time keeps them. Quitting Purrch during those seconds still recycles them.
 - [ ] With a timer running, the pill shows the timer instead of the download; with music playing, the download wins.
 
+**Weather**
+
+- [ ] With location on (Windows Settings → Privacy & security → Location, including "Let desktop apps access your location"), Weather shows your town, the current temperature with a colour icon, the condition, H and L, and Feels, Wind and Humid along the bottom. Windows 11 may ask first whether Purrch can use your location.
+- [ ] "Next 12 hours" starts with "Now" in the accent colour, then hours like "3PM" (or "15" with a 24-hour clock). "This week" starts with "Today" and has a bar per day showing its low-to-high range.
+- [ ] With location off, it says "Location is off for desktop apps…" with **Try again** and **Location settings**; the second opens the Windows location page.
+- [ ] Settings → Integrations → Weather: typing a city (e.g. "Pune") switches the forecast to it a moment after you stop typing; an unknown city says "Couldn't find …". Clearing it goes back to your location. **Fahrenheit** switches to °F and mph at once.
+- [ ] The refresh arrow spins while loading; its tooltip says when the forecast was updated. With no internet, the last forecast stays on screen.
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -228,6 +236,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | File Converter format, max size and quality | `%APPDATA%\Purrch\converter.json` |
 | Converted images | Next to the originals, as `name-converted.ext` |
 | Downloads | Nothing stored; it reads your Downloads folder. Deleted files go to the Recycle Bin |
+| Last weather forecast (city and °F are in `settings.json`) | `%APPDATA%\Purrch\weather.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |

@@ -12,7 +12,7 @@ namespace Purrch.Interface;
 /// Settings: a section list on the left, the section's rows on the right.
 public sealed class SettingsView : Grid
 {
-    public enum Section { Appearance, Behaviour, Modules, AI, About }
+    public enum Section { Appearance, Behaviour, Modules, AI, Integrations, About }
 
     /// Remembered across openings, like the Mac app's @State while the panel lives.
     private static Section _section = Section.Appearance;
@@ -60,6 +60,7 @@ public sealed class SettingsView : Grid
         Section.Behaviour => "\uE962",
         Section.Modules => "\uF0E2",
         Section.AI => "\uE945",
+        Section.Integrations => "\uE8D7",
         _ => "\uE946",
     };
 
@@ -89,6 +90,9 @@ public sealed class SettingsView : Grid
                 break;
             case Section.AI:
                 BuildAi();
+                break;
+            case Section.Integrations:
+                BuildIntegrations();
                 break;
             case Section.About:
                 BuildAbout();
@@ -181,6 +185,49 @@ public sealed class SettingsView : Grid
         Add(Secret("Gemini API key (free at aistudio.google.com/apikey)", AiProvider.Gemini));
         Add(Toggle("Web search", "Let Claude search the web when it needs fresh information.",
             _settings.AssistantWebSearch, v => _settings.AssistantWebSearch = v));
+    }
+
+    private void BuildIntegrations()
+    {
+        Add(Heading("Weather"));
+        Add(Plain("City (blank = use location)", _settings.WeatherCity, v => _settings.WeatherCity = v));
+        Add(Toggle("Fahrenheit", "", _settings.UseFahrenheit, v => _settings.UseFahrenheit = v));
+    }
+
+    /// A plain text field. Commits a moment after typing stops, so each key doesn't start a new lookup.
+    private static UIElement Plain(string title, string value, Action<string> commit)
+    {
+        var box = Ui.Input(value);
+        var save = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(0.6) };
+        save.Tick += (_, _) =>
+        {
+            save.Stop();
+            commit(box.Text.Trim());
+        };
+        box.TextChanged += (_, _) => { save.Stop(); save.Start(); };
+        // Leaving the page (or the panel) shouldn't lose the last edit.
+        box.Unloaded += (_, _) =>
+        {
+            if (!save.IsEnabled) return;
+            save.Stop();
+            commit(box.Text.Trim());
+        };
+
+        var frame = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(8, 7, 8, 7),
+            BorderThickness = new Thickness(0.6),
+            Child = box,
+            Margin = new Thickness(0, 4, 0, 0),
+        };
+        frame.SetResourceReference(Border.BackgroundProperty, ThemeResources.Surface);
+        frame.SetResourceReference(Border.BorderBrushProperty, ThemeResources.Border);
+
+        var stack = new StackPanel();
+        stack.Children.Add(Ui.Text(title, 11, ThemeResources.SecondaryText));
+        stack.Children.Add(frame);
+        return stack;
     }
 
     /// A masked key field. Saves to Credential Manager a moment after typing stops; clearing it deletes the key.

@@ -25,6 +25,8 @@ public sealed class AppSettings : INotifyPropertyChanged
         public bool LaunchAtStartupDefaulted { get; set; }
         public string AiProvider { get; set; } = "claude";
         public bool AssistantWebSearch { get; set; }
+        public string WeatherCity { get; set; } = "";
+        public bool UseFahrenheit { get; set; }
     }
 
     private static readonly JsonSerializerOptions Json = new()
@@ -106,6 +108,20 @@ public sealed class AppSettings : INotifyPropertyChanged
     {
         get => _data.AssistantWebSearch;
         set { if (_data.AssistantWebSearch != value) { _data.AssistantWebSearch = value; Changed(); } }
+    }
+
+    /// City for the Weather module; empty means use this PC's location.
+    public string WeatherCity
+    {
+        get => _data.WeatherCity;
+        set { if (_data.WeatherCity != value) { _data.WeatherCity = value; Changed(); } }
+    }
+
+    /// Weather in °F and mph instead of °C and km/h.
+    public bool UseFahrenheit
+    {
+        get => _data.UseFahrenheit;
+        set { if (_data.UseFahrenheit != value) { _data.UseFahrenheit = value; Changed(); } }
     }
 
     /// Lives in the registry, not settings.json, so Task Manager's Startup tab and this toggle agree.
