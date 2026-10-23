@@ -7,10 +7,14 @@ public sealed class ShelfEntry
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Path { get; set; } = "";
+    /// The drive's serial and the file's NTFS ID, so a renamed or moved file is followed like a Mac bookmark.
+    /// Null for entries saved before IDs were kept, and on drives without stable IDs.
+    public ulong? Volume { get; set; }
+    public string? FileId { get; set; }
     public DateTime Added { get; set; } = DateTime.Now;
 }
 
-/// Files parked in the pill. They are referenced by path, never copied. Saved to shelf.json.
+/// Files parked in the pill. They are referenced by path and file ID, never copied. Saved to shelf.json.
 public sealed class ShelfStore
 {
     public static ShelfStore Shared { get; } = new();
@@ -35,9 +39,10 @@ public sealed class ShelfStore
         foreach (var raw in paths)
         {
             if (Normalise(raw) is not { } path) continue;
-            if (!File.Exists(path) && !Directory.Exists(path)) continue;
+            if (!Exists(path)) continue;
             if (_entries.Any(e => string.Equals(e.Path, path, StringComparison.OrdinalIgnoreCase))) continue;
-            _entries.Add(new ShelfEntry { Path = path });
+            var identity = FileIdentity.Of(path);
+            _entries.Add(new ShelfEntry { Path = path, Volume = identity?.Volume, FileId = identity?.Id });
             changed = true;
         }
         if (changed) Save();
@@ -55,11 +60,34 @@ public sealed class ShelfStore
         Save();
     }
 
-    /// Drops files that were deleted or moved away since they were parked.
+    /// Follows files that were renamed or moved on the same drive, and drops ones that were deleted
+    /// (or moved to another drive) since they were parked.
     public void Prune()
     {
-        if (_entries.RemoveAll(e => !File.Exists(e.Path) && !Directory.Exists(e.Path)) > 0) Save();
+        var changed = false;
+        foreach (var entry in _entries.ToList())
+        {
+            if (Exists(entry.Path))
+            {
+                // Entries from before IDs were kept pick one up the first time they are seen.
+                if (entry.FileId == null && FileIdentity.Of(entry.Path) is { } identity)
+                {
+                    (entry.Volume, entry.FileId) = identity;
+                    changed = true;
+                }
+                continue;
+            }
+            var moved = entry is { Volume: { } volume, FileId: { } id } ? FileIdentity.Find(entry.Path, volume, id) : null;
+            if (moved != null && !_entries.Any(e => e != entry && string.Equals(e.Path, moved, StringComparison.OrdinalIgnoreCase)))
+                entry.Path = moved;
+            else
+                _entries.Remove(entry);
+            changed = true;
+        }
+        if (changed) Save();
     }
+
+    private static bool Exists(string path) => File.Exists(path) || Directory.Exists(path);
 
     private static string? Normalise(string path)
     {

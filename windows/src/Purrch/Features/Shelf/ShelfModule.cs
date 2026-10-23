@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using Microsoft.Win32;
 using Purrch.Core;
@@ -24,6 +25,9 @@ public sealed class ShelfModule : DockPanel
     // Sizes are worked out once per file; folders can take a moment.
     private readonly Dictionary<string, long> _sizes = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<Guid> _shown = new();
+    // Tiles on their way out; a second click on the same one does nothing.
+    private readonly HashSet<Guid> _leaving = new();
+    private readonly ContextMenu _addMenu;
     private bool _targeted;
 
     public ShelfModule()
@@ -61,6 +65,7 @@ public sealed class ShelfModule : DockPanel
         };
         _targetOverlay = TargetOverlay();
         Children.Add(_middle);
+        _addMenu = AddMenu();
 
         DragOver += OnDragOver;
         DragLeave += OnDragLeave;
@@ -84,7 +89,7 @@ public sealed class ShelfModule : DockPanel
             : entries.Count == 1 ? "1 item" : $"{entries.Count} items";
 
         _actions.Children.Clear();
-        _actions.Children.Add(Ui.Pill("Add", "\uE710", ChooseFiles));
+        _actions.Children.Add(AddButton());
         if (entries.Count > 0)
         {
             if (entries.Count > 1)
@@ -93,7 +98,7 @@ public sealed class ShelfModule : DockPanel
                 share.Margin = new Thickness(8, 0, 0, 0);
                 _actions.Children.Add(share);
             }
-            var clear = Ui.Pill("Clear", "\uE74D", _store.Clear);
+            var clear = Ui.Pill("Clear", "\uE74D", ClearAnimated);
             clear.Margin = new Thickness(8, 0, 0, 0);
             _actions.Children.Add(clear);
         }
@@ -107,9 +112,11 @@ public sealed class ShelfModule : DockPanel
         }
 
         _row.Children.Clear();
-        foreach (var entry in entries)
+        // A rebuild mid-animation (a folder's size arriving) leaves out tiles already on their way out.
+        _leaving.IntersectWith(entries.Select(e => e.Id));
+        foreach (var entry in entries.Where(e => !_leaving.Contains(e.Id)))
         {
-            var tile = new ShelfTile(entry, SizeOf(entry));
+            var tile = new ShelfTile(entry, SizeOf(entry), RemoveAnimated);
             tile.Margin = new Thickness(0, 0, 12, 0);
             if (_shown.Add(entry.Id)) tile.PopIn();
             _row.Children.Add(tile);
@@ -134,10 +141,74 @@ public sealed class ShelfModule : DockPanel
         return null;
     }
 
-    private void ChooseFiles()
+    // MARK: - Adding and removing
+
+    /// "Add" opens a small menu, files or folders, as the Mac app's open panel takes both.
+    private Button AddButton()
     {
-        var dialog = new OpenFileDialog { Multiselect = true, Title = "Add to Shelf" };
-        if (dialog.ShowDialog(Window.GetWindow(this)) == true) _store.Add(dialog.FileNames);
+        Button? button = null;
+        button = Ui.Pill("Add", "\uE710", () =>
+        {
+            _addMenu.PlacementTarget = button;
+            _addMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            _addMenu.IsOpen = true;
+        });
+        // Parenting the menu to the button lets the panel see it open, so it doesn't fold away meanwhile.
+        button.ContextMenu = _addMenu;
+        return button;
+    }
+
+    private ContextMenu AddMenu()
+    {
+        var menu = new ContextMenu();
+        var files = new MenuItem { Header = "Add files…" };
+        files.Click += (_, _) => Choose(new OpenFileDialog { Multiselect = true, Title = "Add to Shelf" },
+            d => ((OpenFileDialog)d).FileNames);
+        menu.Items.Add(files);
+        var folders = new MenuItem { Header = "Add folder…" };
+        folders.Click += (_, _) => Choose(new OpenFolderDialog { Multiselect = true, Title = "Add to Shelf" },
+            d => ((OpenFolderDialog)d).FolderNames);
+        menu.Items.Add(folders);
+        return menu;
+    }
+
+    private void Choose(CommonItemDialog dialog, Func<CommonItemDialog, string[]> picked)
+    {
+        // Treated like a right-click menu by the pill window, so the panel stays open while the dialog is up.
+        RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent, this));
+        try
+        {
+            var owner = Window.GetWindow(this);
+            if ((owner != null ? dialog.ShowDialog(owner) : dialog.ShowDialog()) == true) _store.Add(picked(dialog));
+        }
+        finally
+        {
+            RaiseEvent(new RoutedEventArgs(ContextMenu.ClosedEvent, this));
+        }
+    }
+
+    /// The tile shrinks and fades, the tiles after it close the gap, then the entry goes.
+    private void RemoveAnimated(ShelfEntry entry)
+    {
+        if (!_leaving.Add(entry.Id)) return;
+        if (_row.Children.OfType<ShelfTile>().FirstOrDefault(t => t.Entry.Id == entry.Id) is not { } tile)
+        {
+            _store.Remove(entry);
+            return;
+        }
+        tile.PopOut(collapse: true, () => _store.Remove(entry));
+    }
+
+    private void ClearAnimated()
+    {
+        var tiles = _row.Children.OfType<ShelfTile>().Where(t => _leaving.Add(t.Entry.Id)).ToList();
+        if (tiles.Count == 0)
+        {
+            _store.Clear();
+            return;
+        }
+        for (var i = 0; i < tiles.Count; i++)
+            tiles[i].PopOut(collapse: false, i == tiles.Count - 1 ? _store.Clear : null);
     }
 
     // MARK: - Dropping in
@@ -241,15 +312,17 @@ internal sealed class ShelfTile : StackPanel
     private const double TileWidth = 150;
     private const double DragThreshold = 6;
     private readonly ShelfEntry _entry;
+    private readonly Action<ShelfEntry> _remove;
     private readonly Border _card;
     private readonly Border _frame;
     private readonly StackPanel _buttons = new() { Orientation = Orientation.Horizontal };
     private readonly CancellationTokenSource _thumbnail = new();
     private Point? _pressPoint;
 
-    public ShelfTile(ShelfEntry entry, long? size)
+    public ShelfTile(ShelfEntry entry, long? size, Action<ShelfEntry> remove)
     {
         _entry = entry;
+        _remove = remove;
         var path = entry.Path;
         Width = TileWidth;
         Background = Brushes.Transparent;
@@ -289,9 +362,9 @@ internal sealed class ShelfTile : StackPanel
         _buttons.Margin = new Thickness(6);
         _buttons.Visibility = Visibility.Hidden;
         _buttons.Children.Add(MiniButton("\uE72D", "Share", () => FileMeta.Share(new[] { path }, this)));
-        var remove = MiniButton("\uE711", "Remove from shelf", () => ShelfStore.Shared.Remove(entry));
-        remove.Margin = new Thickness(4, 0, 0, 0);
-        _buttons.Children.Add(remove);
+        var removeButton = MiniButton("\uE711", "Remove from shelf", () => remove(entry));
+        removeButton.Margin = new Thickness(4, 0, 0, 0);
+        _buttons.Children.Add(removeButton);
         art.Children.Add(_buttons);
         Children.Add(art);
 
@@ -325,6 +398,8 @@ internal sealed class ShelfTile : StackPanel
         Unloaded += (_, _) => _thumbnail.Cancel();
     }
 
+    public ShelfEntry Entry => _entry;
+
     /// New tiles grow in from slightly smaller.
     public void PopIn()
     {
@@ -335,6 +410,35 @@ internal sealed class ShelfTile : StackPanel
         scale.Animate(ScaleTransform.ScaleXProperty, 1, Motion.Pop);
         scale.Animate(ScaleTransform.ScaleYProperty, 1, Motion.Pop);
         this.Animate(OpacityProperty, 1, Motion.ExpoOut(0.3));
+    }
+
+    /// Shrinks and fades away, the Mac tile's scale and opacity transition. With <paramref name="collapse"/>
+    /// the space it took closes up too, so the tiles after it slide over.
+    public void PopOut(bool collapse, Action? completed)
+    {
+        IsHitTestVisible = false;
+        var scale = new ScaleTransform(1, 1);
+        RenderTransformOrigin = new Point(0.5, 0.5);
+        RenderTransform = scale;
+        var fade = Motion.ExpoOut(0.2);
+        scale.Animate(ScaleTransform.ScaleXProperty, 0.9, fade);
+        scale.Animate(ScaleTransform.ScaleYProperty, 0.9, fade);
+        if (!collapse)
+        {
+            this.Animate(OpacityProperty, 0, fade, completed: completed);
+            return;
+        }
+        this.Animate(OpacityProperty, 0, fade);
+        ClipToBounds = true;
+        var slide = Motion.ExpoOut(0.3);
+        this.Animate(WidthProperty, 0, slide, delay: 0.08);
+        var gap = new ThicknessAnimation(new Thickness(0), TimeSpan.FromSeconds(slide.Seconds))
+        {
+            EasingFunction = slide.Easing,
+            BeginTime = TimeSpan.FromSeconds(0.08),
+        };
+        if (completed != null) gap.Completed += (_, _) => completed();
+        BeginAnimation(MarginProperty, gap);
     }
 
     private void SetHover(bool hovering)
@@ -376,7 +480,7 @@ internal sealed class ShelfTile : StackPanel
         Add("Copy", () => FileMeta.CopyFiles(new[] { entry.Path }));
         Add("Share", () => FileMeta.Share(new[] { entry.Path }, this));
         menu.Items.Add(new Separator());
-        Add("Remove from Shelf", () => ShelfStore.Shared.Remove(entry));
+        Add("Remove from Shelf", () => _remove(entry));
         return menu;
     }
 

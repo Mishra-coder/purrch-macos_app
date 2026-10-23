@@ -221,11 +221,12 @@ None of this has run on a real Windows machine yet. Please go through the list a
 **Shelf**
 
 - [ ] Dragging a file from File Explorer onto the closed pill opens the panel on Shelf; dropping it there adds a tile with its thumbnail (pictures, videos, PDFs) or icon, a type tag, its name and size. While dragging, the area shows a dashed outline and "Release to add".
-- [ ] **Add** picks files with the Open dialog. A file already on the shelf isn't added twice. Folders can be dropped too.
+- [ ] **Add** opens a small menu: **Add files…** picks files with the Open dialog, **Add folder…** picks one or more folders. The panel stays open while the menu and the dialog are up. A file already on the shelf isn't added twice. Folders can be dropped too.
 - [ ] Dragging a tile into a folder, an email or a chat box drops the file itself (copied, the original stays where it was). Double-click opens it.
 - [ ] Hover shows Share and remove; right-click shows Open, Show in File Explorer, Copy, Share and Remove from Shelf. Copy then Ctrl+V in File Explorer pastes the file; for a picture, Ctrl+V in a chat pastes the image.
 - [ ] Share opens the Windows share sheet (Nearby Sharing, Mail, ...). With two or more files, **Share all** sends them together.
-- [ ] The shelf is the same after restarting Purrch. A file deleted or moved away in File Explorer disappears from the shelf the next time you open it.
+- [ ] Removing a tile (x or the menu) shrinks and fades it, and the tiles after it slide over; **Clear** fades them all out.
+- [ ] The shelf is the same after restarting Purrch. Rename a parked file, or move it to another folder on the same drive: the tile follows it (new name, still opens) the next time you open Shelf. Deleting it (Recycle Bin) or moving it to another drive removes it from the shelf.
 
 **Captures**
 
@@ -344,7 +345,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Water reminders still to come (up to 16) | Windows' notification schedule |
 | Message text and whether it shows | `%APPDATA%\Purrch\message.json` |
 | Ambience volumes | `%APPDATA%\Purrch\ambience.json` |
-| Shelf (paths only; the files stay where they are) | `%APPDATA%\Purrch\shelf.json` |
+| Shelf (paths and file IDs only; the files stay where they are) | `%APPDATA%\Purrch\shelf.json` |
 | Captures (read from, nothing saved) | Pictures → Screenshots, Videos → Screen Recordings, Videos → Captures |
 | File Converter format, max size and quality | `%APPDATA%\Purrch\converter.json` |
 | Converted images | Next to the originals, as `name-converted.ext` |
@@ -393,6 +394,7 @@ How it maps to the Mac app:
 - Opening the panel from the tray, a second launch or the welcome screen gives it the keyboard straight away. Opening it by hovering doesn't, because on Windows that would take focus from the app you are in; click inside first to type. When the panel closes, keyboard focus goes back to the app you were in.
 - The closed pill shows a message first, then a running timer, then a download, then music.
 - Chrome, Edge and Firefox don't write the expected size of a download next to the file, so download progress is estimated (as it is for Chrome on the Mac) and the percentage shows as "…".
+- The Shelf follows a renamed or moved file only on the same drive (as NTFS file IDs do); moved to another drive, it drops off the shelf.
 - Dragging files onto the closed pill opens the Shelf. To drop images on the File Converter, pin the panel first: pressing the mouse in File Explorer to start the drag closes an unpinned panel.
 - The exe is not code-signed, so SmartScreen warns on first run.
 - Water reminders are queued with Windows eight hours ahead, and topped up while Purrch runs. If Purrch isn't started for longer than that, they pause until it runs again.

@@ -440,3 +440,113 @@ public static class FileMeta
     [DllImport("shell32.dll")]
     private static extern int SHOpenFolderAndSelectItems(IntPtr folder, uint count, IntPtr[] items, uint flags);
 }
+
+/// A file's NTFS identity (volume serial plus file ID), the Windows side of the Mac app's bookmarks:
+/// the ID stays the same when the file is renamed or moved within its drive, so a moved file can be found again.
+public static class FileIdentity
+{
+    /// Volume serial and the 128-bit file ID as hex, or null when the drive has no stable IDs (FAT, network shares).
+    public static (ulong Volume, string Id)? Of(string path)
+    {
+        using var handle = Open(path);
+        if (handle.IsInvalid) return null;
+        return Read(handle);
+    }
+
+    /// Where the file with this identity is now, or null when it is gone (or in the Recycle Bin).
+    /// <paramref name="hint"/> is the last known path; its drive is searched.
+    public static string? Find(string hint, ulong volume, string id)
+    {
+        if (id.Length != 32 || !ulong.TryParse(id[..16], System.Globalization.NumberStyles.HexNumber, null, out var high)
+            || !ulong.TryParse(id[16..], System.Globalization.NumberStyles.HexNumber, null, out var low))
+            return null;
+        string? root;
+        try { root = Path.GetPathRoot(hint); }
+        catch (ArgumentException) { return null; }
+        if (string.IsNullOrEmpty(root)) return null;
+
+        // Any handle on the drive tells OpenFileById which volume to look on.
+        using var rootHandle = Open(root);
+        if (rootHandle.IsInvalid || Read(rootHandle) is not { } drive || drive.Volume != volume) return null;
+
+        var descriptor = new FILE_ID_DESCRIPTOR { Size = Marshal.SizeOf<FILE_ID_DESCRIPTOR>(), Type = ExtendedFileIdType, Low = low, High = high };
+        using var file = OpenFileById(rootHandle, ref descriptor, 0, ShareAll, IntPtr.Zero, FILE_FLAG_BACKUP_SEMANTICS);
+        if (file.IsInvalid) return null;
+
+        var buffer = new char[1024];
+        var length = GetFinalPathNameByHandle(file, buffer, (uint)buffer.Length, 0);
+        if (length == 0 || length >= buffer.Length) return null;
+        var found = new string(buffer, 0, (int)length);
+        // "\\?\C:\..." and "\\?\UNC\server\share\..." back to the usual forms.
+        if (found.StartsWith(@"\\?\UNC\", StringComparison.Ordinal)) found = @"\\" + found[8..];
+        else if (found.StartsWith(@"\\?\", StringComparison.Ordinal)) found = found[4..];
+        // Deleting moves a file into the Recycle Bin with the same ID; that counts as gone.
+        if (found.Contains(@"\$Recycle.Bin\", StringComparison.OrdinalIgnoreCase)) return null;
+        return File.Exists(found) || Directory.Exists(found) ? found : null;
+    }
+
+    private static Microsoft.Win32.SafeHandles.SafeFileHandle Open(string path) =>
+        // No access rights needed to read the ID; backup semantics lets the same call open folders.
+        CreateFile(path, 0, ShareAll, IntPtr.Zero, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, IntPtr.Zero);
+
+    private static (ulong Volume, string Id)? Read(Microsoft.Win32.SafeHandles.SafeFileHandle handle)
+    {
+        if (GetFileInformationByHandleEx(handle, FileIdInfo, out FILE_ID_INFO info, Marshal.SizeOf<FILE_ID_INFO>()))
+            return (info.VolumeSerialNumber, $"{info.High:X16}{info.Low:X16}");
+        // Older file systems only have the 64-bit index; it fits the low half of the 128-bit ID.
+        if (GetFileInformationByHandle(handle, out BY_HANDLE_FILE_INFORMATION legacy))
+            return (legacy.VolumeSerialNumber, $"{0:X16}{((ulong)legacy.FileIndexHigh << 32) | legacy.FileIndexLow:X16}");
+        return null;
+    }
+
+    private const uint ShareAll = 0x1 | 0x2 | 0x4; // read, write, delete
+    private const uint OPEN_EXISTING = 3;
+    private const uint FILE_FLAG_BACKUP_SEMANTICS = 0x02000000;
+    private const int FileIdInfo = 18;
+    private const int ExtendedFileIdType = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FILE_ID_INFO
+    {
+        public ulong VolumeSerialNumber;
+        // FILE_ID_128, little-endian halves.
+        public ulong Low, High;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BY_HANDLE_FILE_INFORMATION
+    {
+        public uint FileAttributes;
+        public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime, LastAccessTime, LastWriteTime;
+        public uint VolumeSerialNumber, FileSizeHigh, FileSizeLow, NumberOfLinks, FileIndexHigh, FileIndexLow;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FILE_ID_DESCRIPTOR
+    {
+        public int Size;
+        public int Type;
+        // The union's FILE_ID_128 (16 bytes); a 64-bit FileIdType would use Low alone.
+        public ulong Low, High;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, EntryPoint = "CreateFileW", SetLastError = true)]
+    private static extern Microsoft.Win32.SafeHandles.SafeFileHandle CreateFile(string path, uint access, uint share,
+        IntPtr security, uint creation, uint flags, IntPtr template);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileInformationByHandleEx(Microsoft.Win32.SafeHandles.SafeFileHandle handle, int infoClass,
+        out FILE_ID_INFO info, int size);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileInformationByHandle(Microsoft.Win32.SafeHandles.SafeFileHandle handle,
+        out BY_HANDLE_FILE_INFORMATION info);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern Microsoft.Win32.SafeHandles.SafeFileHandle OpenFileById(Microsoft.Win32.SafeHandles.SafeFileHandle volumeHint,
+        ref FILE_ID_DESCRIPTOR id, uint access, uint share, IntPtr security, uint flags);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetFinalPathNameByHandleW", SetLastError = true)]
+    private static extern uint GetFinalPathNameByHandle(Microsoft.Win32.SafeHandles.SafeFileHandle handle, [Out] char[] path,
+        uint size, uint flags);
+}
