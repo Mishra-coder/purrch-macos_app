@@ -276,10 +276,44 @@ public static class FileMeta
     }
 
     /// Opens File Explorer with the file selected.
-    public static void Reveal(string path)
+    public static void Reveal(string path) => Reveal(new[] { path });
+
+    /// Opens File Explorer with all the files selected, one window per folder they are in
+    /// (FileMeta.reveal with several URLs in the Mac app).
+    public static void Reveal(IEnumerable<string> paths)
+    {
+        foreach (var folder in paths.GroupBy(p => Path.GetDirectoryName(p.TrimEnd('\\')) ?? p, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!SelectInFolder(folder.Key, folder.ToList())) RevealOne(folder.First());
+        }
+    }
+
+    private static void RevealOne(string path)
     {
         try { Process.Start("explorer.exe", $"/select,\"{path}\""); }
         catch (System.ComponentModel.Win32Exception e) { Log.Write($"Couldn't show {path}: {e.Message}"); }
+    }
+
+    /// The shell call behind explorer /select, which unlike the command line can select several items.
+    private static bool SelectInFolder(string folder, IReadOnlyList<string> paths)
+    {
+        var folderId = ILCreateFromPathW(folder);
+        if (folderId == IntPtr.Zero) return false;
+        var items = paths.Select(p => ILCreateFromPathW(p)).Where(id => id != IntPtr.Zero).ToArray();
+        try
+        {
+            return items.Length > 0 && SHOpenFolderAndSelectItems(folderId, (uint)items.Length, items, 0) == 0;
+        }
+        catch (COMException e)
+        {
+            Log.Write($"Couldn't show {folder}: {e.Message}");
+            return false;
+        }
+        finally
+        {
+            foreach (var id in items) ILFree(id);
+            ILFree(folderId);
+        }
     }
 
     /// Opens a folder in File Explorer.
@@ -396,4 +430,13 @@ public static class FileMeta
             Log.Write($"Share sheet unavailable: {e.Message}");
         }
     }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr ILCreateFromPathW(string path);
+
+    [DllImport("shell32.dll")]
+    private static extern void ILFree(IntPtr id);
+
+    [DllImport("shell32.dll")]
+    private static extern int SHOpenFolderAndSelectItems(IntPtr folder, uint count, IntPtr[] items, uint flags);
 }

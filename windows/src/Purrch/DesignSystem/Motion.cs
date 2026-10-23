@@ -19,6 +19,10 @@ public static class Motion
     public static Curve ExpoOut(double seconds = 0.5) =>
         new(seconds, Frozen(new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 7 }));
 
+    /// Plain ease-out for small state changes such as ticks and fades, like SwiftUI's .easeOut(duration:).
+    public static Curve EaseOut(double seconds) =>
+        new(seconds, Frozen(new QuadraticEase { EasingMode = EasingMode.EaseOut }));
+
     public static Curve Linear(double seconds) => new(seconds, null);
 
     private static EasingFunctionBase Frozen(EasingFunctionBase easing)

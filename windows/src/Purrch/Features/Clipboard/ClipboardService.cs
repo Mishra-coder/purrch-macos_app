@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
@@ -54,6 +55,9 @@ public sealed class ClipboardService
     public static ClipboardService Shared { get; } = new();
 
     private const int MaxItems = 300;
+    /// What browsers put on the clipboard for a link (the Mac's public.url).
+    private const string UrlFormat = "UniformResourceLocatorW";
+    private const string AnsiUrlFormat = "UniformResourceLocator";
     private const int WM_CLIPBOARDUPDATE = 0x031D;
     private static readonly IntPtr HWND_MESSAGE = new(-3);
 
@@ -146,13 +150,8 @@ public sealed class ClipboardService
                 return;
             }
 
-            if (System.Windows.Clipboard.ContainsImage() && System.Windows.Clipboard.GetImage() is { } image)
+            if (ReadPng() is var (png, width, height))
             {
-                var encoder = new PngBitmapEncoder();
-                encoder.Frames.Add(BitmapFrame.Create(image));
-                using var buffer = new MemoryStream();
-                encoder.Save(buffer);
-                var png = buffer.ToArray();
                 var digest = Convert.ToHexString(SHA256.HashData(png))[..24].ToLowerInvariant();
                 var signature = "image:" + digest;
                 if (Bump(signature, source)) return;
@@ -161,7 +160,7 @@ public sealed class ClipboardService
                 Insert(new ClipItem
                 {
                     Kind = ClipKind.Image,
-                    Title = $"Image {image.PixelWidth}×{image.PixelHeight}",
+                    Title = $"Image {width}×{height}",
                     ImagePath = file,
                     Size = png.Length,
                     SourceApp = source,
@@ -171,8 +170,8 @@ public sealed class ClipboardService
                 return;
             }
 
-            if (!System.Windows.Clipboard.ContainsText()) return;
-            var text = System.Windows.Clipboard.GetText();
+            var text = System.Windows.Clipboard.ContainsText() ? System.Windows.Clipboard.GetText() : ReadUrl();
+            if (text == null) return;
             var trimmed = text.Trim();
             if (trimmed.Length == 0) return;
             var textSignature = "text:" + text;
@@ -197,6 +196,41 @@ public sealed class ClipboardService
             // Another app is holding the clipboard, or the data is in a form WPF can't read.
             Log.Write($"Clipboard capture skipped: {e.Message}");
         }
+    }
+
+    /// The picture on the clipboard as PNG bytes. The "PNG" format that browsers, the Snipping Tool and
+    /// Office add keeps transparency; the plain bitmap, read when there is none, loses it.
+    private static (byte[] Png, int Width, int Height)? ReadPng()
+    {
+        if (System.Windows.Clipboard.ContainsData("PNG") && System.Windows.Clipboard.GetData("PNG") is MemoryStream stream)
+        {
+            var bytes = stream.ToArray();
+            try
+            {
+                var frame = BitmapDecoder.Create(new MemoryStream(bytes), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+                return (bytes, frame.PixelWidth, frame.PixelHeight);
+            }
+            catch (Exception e) when (e is NotSupportedException or FileFormatException or ArgumentException or IOException)
+            {
+                // Not a PNG after all; try the bitmap.
+            }
+        }
+        if (!System.Windows.Clipboard.ContainsImage() || System.Windows.Clipboard.GetImage() is not { } image) return null;
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(image));
+        using var buffer = new MemoryStream();
+        encoder.Save(buffer);
+        return (buffer.ToArray(), image.PixelWidth, image.PixelHeight);
+    }
+
+    /// A link copied without any text alongside it, as some apps do.
+    private static string? ReadUrl()
+    {
+        string? url = null;
+        if (System.Windows.Clipboard.GetData(UrlFormat) is MemoryStream wide) url = Encoding.Unicode.GetString(wide.ToArray());
+        else if (System.Windows.Clipboard.GetData(AnsiUrlFormat) is MemoryStream ansi) url = Encoding.Latin1.GetString(ansi.ToArray());
+        url = url?.Split('\0', 2)[0];
+        return string.IsNullOrWhiteSpace(url) ? null : url;
     }
 
     private static bool IsOptedOut()
@@ -276,8 +310,12 @@ public sealed class ClipboardService
             switch (item.Kind)
             {
                 case ClipKind.Text:
+                    data.SetText(item.Text ?? "");
+                    break;
                 case ClipKind.Url:
                     data.SetText(item.Text ?? "");
+                    // Apps that take links (browsers, Office) read the URL format; everything else the text.
+                    data.SetData(UrlFormat, new MemoryStream(Encoding.Unicode.GetBytes((item.Text ?? "").Trim() + "\0")));
                     break;
                 case ClipKind.Files:
                     var files = new StringCollection();

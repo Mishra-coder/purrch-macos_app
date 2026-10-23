@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -296,7 +295,7 @@ internal sealed class ShelfTile : StackPanel
         art.Children.Add(_buttons);
         Children.Add(art);
 
-        var name = Ui.Text(MiddleTrim(System.IO.Path.GetFileName(path), 12, TileWidth), 12, weight: FontWeights.SemiBold);
+        var name = Ui.Text(Ui.MiddleTrim(System.IO.Path.GetFileName(path), 12, TileWidth, FontWeights.SemiBold), 12, weight: FontWeights.SemiBold);
         name.TextWrapping = TextWrapping.NoWrap;
         name.Margin = new Thickness(0, 5, 0, 0);
         Children.Add(name);
@@ -397,23 +396,5 @@ internal sealed class ShelfTile : StackPanel
             circle.Background = background.Color.WithOpacity(0.85).Brush();
         circle.SetResourceReference(Border.BorderBrushProperty, ThemeResources.Border);
         return Ui.Bare(circle, onClick, tooltip);
-    }
-
-    /// Cuts the middle out of a long name ("Screenshot 20…12.png"), so the extension stays visible.
-    private static string MiddleTrim(string text, double size, double width)
-    {
-        var typeface = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
-        double Measure(string s) => new FormattedText(s, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-            typeface, size, Brushes.Black, 1.0).WidthIncludingTrailingWhitespace;
-        if (Measure(text) <= width) return text;
-        var keep = text.Length - 1;
-        while (keep > 2)
-        {
-            var head = (keep + 1) / 2;
-            var candidate = text[..head] + "…" + text[^(keep - head)..];
-            if (Measure(candidate) <= width) return candidate;
-            keep--;
-        }
-        return "…";
     }
 }

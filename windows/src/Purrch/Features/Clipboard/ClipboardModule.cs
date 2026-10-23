@@ -3,9 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Purrch.Core;
 using Purrch.DesignSystem;
@@ -22,11 +20,14 @@ public sealed class ClipboardModule : DockPanel
     private readonly ScrollViewer _scroll;
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(30) };
     private string _query = "";
+    /// The item whose "Copied" mark is on screen, so the mark fades in once and fades out when it goes.
+    private Guid? _shownCopiedId;
+    private bool _clearing;
 
     public ClipboardModule()
     {
         var top = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
-        var clear = Ui.IconButton("\uE74D", 34, _service.ClearUnpinned, tooltip: "Clear unpinned items");
+        var clear = Ui.IconButton("\uE74D", 34, ClearUnpinned, tooltip: "Clear unpinned items");
         clear.Margin = new Thickness(8, 0, 0, 0);
         DockPanel.SetDock(clear, Dock.Right);
         top.Children.Add(clear);
@@ -54,8 +55,34 @@ public sealed class ClipboardModule : DockPanel
                               || (i.Paths?.Any(Has) ?? false));
     }
 
+    /// Fades the unpinned rows out, then removes them.
+    private void ClearUnpinned()
+    {
+        if (_clearing) return;
+        var leaving = _body.Content == _scroll
+            ? _list.Children.OfType<ClipRow>().Where(r => !r.Item.Pinned).ToList()
+            : new List<ClipRow>();
+        if (leaving.Count == 0)
+        {
+            _service.ClearUnpinned();
+            return;
+        }
+        _clearing = true;
+        foreach (var row in leaving)
+        {
+            row.IsHitTestVisible = false;
+            row.Animate(OpacityProperty, 0, Motion.EaseOut(0.2), completed: row == leaving[^1] ? () =>
+            {
+                _clearing = false;
+                _service.ClearUnpinned();
+            } : null);
+        }
+    }
+
     private void Rebuild()
     {
+        var shown = _shownCopiedId;
+        _shownCopiedId = _service.LastCopiedId;
         if (_service.Items.Count == 0)
         {
             _body.Content = Ui.EmptyState("\uE77F", "Nothing copied yet", "Text, links, files and images you copy will appear here.");
@@ -68,7 +95,7 @@ public sealed class ClipboardModule : DockPanel
             return;
         }
         _list.Children.Clear();
-        foreach (var item in items) _list.Children.Add(new ClipRow(item, _service.LastCopiedId == item.Id));
+        foreach (var item in items) _list.Children.Add(new ClipRow(item, _service.LastCopiedId == item.Id, shown == item.Id));
         _body.Content = _scroll;
     }
 }
@@ -79,9 +106,12 @@ internal sealed class ClipRow : Border
     private const double DragThreshold = 6;
     private readonly ClipItem _item;
     private readonly Button _pin;
+    private readonly CancellationTokenSource _thumbnail = new();
     private Point? _pressPoint;
 
-    public ClipRow(ClipItem item, bool copied)
+    /// <paramref name="wasCopied"/>: the row showed "Copied" before this rebuild, so the mark fades
+    /// out when it is no longer copied, and doesn't fade in again while it still is.
+    public ClipRow(ClipItem item, bool copied, bool wasCopied)
     {
         _item = item;
         CornerRadius = new CornerRadius(12);
@@ -93,14 +123,14 @@ internal sealed class ClipRow : Border
 
         var row = new DockPanel();
 
-        var tint = TagColor(item);
+        var tint = FileMeta.ColorFor(item.TagLabel);
         var icon = new Border
         {
             Width = 34,
             Height = 34,
             CornerRadius = new CornerRadius(8),
             Background = tint.WithOpacity(0.14).Brush(),
-            Child = Icon(item, tint),
+            Child = Icon(item, tint, _thumbnail.Token),
             ClipToBounds = true,
             Margin = new Thickness(0, 0, 10, 0),
         };
@@ -116,7 +146,7 @@ internal sealed class ClipRow : Border
         DockPanel.SetDock(_pin, Dock.Right);
         row.Children.Add(_pin);
 
-        if (copied)
+        if (copied || wasCopied)
         {
             var done = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 0, 6, 0) };
             done.Children.Add(Ui.Glyph("\uE73E", 11, ThemeResources.Accent));
@@ -125,13 +155,15 @@ internal sealed class ClipRow : Border
             done.Children.Add(label);
             DockPanel.SetDock(done, Dock.Right);
             row.Children.Add(done);
+            if (copied != wasCopied)
+            {
+                done.Opacity = copied ? 0 : 1;
+                done.Animate(OpacityProperty, copied ? 1 : 0, Motion.EaseOut(0.15));
+            }
         }
 
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        var title = Ui.Text(item.Title, 13, weight: FontWeights.SemiBold);
-        title.TextWrapping = TextWrapping.NoWrap;
-        title.TextTrimming = TextTrimming.CharacterEllipsis;
-        text.Children.Add(title);
+        text.Children.Add(Ui.MiddleTrimmed(item.Title, 13, weight: FontWeights.SemiBold));
 
         var meta = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 3, 0, 0) };
         var tag = new Border
@@ -167,7 +199,10 @@ internal sealed class ClipRow : Border
             if (_pressPoint != null && !_pin.IsMouseOver) ClipboardService.Shared.Copy(_item);
             _pressPoint = null;
         };
+        Unloaded += (_, _) => _thumbnail.Cancel();
     }
+
+    public ClipItem Item => _item;
 
     private void OnMouseMove(object sender, MouseEventArgs e)
     {
@@ -190,8 +225,8 @@ internal sealed class ClipRow : Border
         }
         Add("Copy", () => service.Copy(item));
         Add(item.Pinned ? "Unpin" : "Pin", () => service.TogglePin(item));
-        if (item.Kind == ClipKind.Files && item.Paths is [var first, ..])
-            Add("Show in File Explorer", () => Process.Start("explorer.exe", $"/select,\"{first}\""));
+        if (item.Kind == ClipKind.Files && item.Paths is { Count: > 0 } paths)
+            Add("Show in File Explorer", () => FileMeta.Reveal(paths));
         if (item.Kind == ClipKind.Url && item.Text is { } link)
             Add("Open Link", () => Process.Start(new ProcessStartInfo(link.Trim()) { UseShellExecute = true }));
         menu.Items.Add(new Separator());
@@ -211,55 +246,41 @@ internal sealed class ClipRow : Border
     private static string? Preview(string? text) =>
         text is null ? null : text.Length > 600 ? text[..600] + "…" : text;
 
-    private static Color TagColor(ClipItem item) => item.Kind switch
-    {
-        ClipKind.Text => Color.FromRgb(0x98, 0x98, 0x9D),
-        ClipKind.Url => Color.FromRgb(0x0A, 0x84, 0xFF),
-        ClipKind.Image => Color.FromRgb(0xBF, 0x5A, 0xF2),
-        _ => item.TagLabel == "Folder" ? Color.FromRgb(0x64, 0xD2, 0xFF) : Color.FromRgb(0xFF, 0x9F, 0x0A),
-    };
-
-    private static UIElement Icon(ClipItem item, Color tint)
+    private static UIElement Icon(ClipItem item, Color tint, CancellationToken token)
     {
         switch (item.Kind)
         {
             case ClipKind.Image when item.ImagePath is { } path && File.Exists(path):
                 return new Image { Source = ClipboardService.LoadImage(path, 68), Stretch = Stretch.UniformToFill };
-            case ClipKind.Files when item.Paths is [var first, ..] && FileIcon(first) is { } fileIcon:
-                return new Image { Source = fileIcon, Margin = new Thickness(3), Stretch = Stretch.Uniform };
+            case ClipKind.Files when item.Paths is [var first, ..]:
+                // File Explorer's own icon (folders included), with a plain glyph until it arrives.
+                var art = new Grid();
+                art.Children.Add(Glyph(Directory.Exists(first) ? "\uE8B7" : "\uE8A5", tint));
+                var image = new Image { Margin = new Thickness(3), Stretch = Stretch.Uniform };
+                art.Children.Add(image);
+                Thumbnails.Request(first, 64, source =>
+                {
+                    if (source == null) return;
+                    image.Source = source;
+                    art.Children.RemoveAt(0);
+                }, token);
+                return art;
             default:
-                var glyph = item.Kind switch
+                return Glyph(item.Kind switch
                 {
                     ClipKind.Url => "\uE71B",
                     ClipKind.Files => "\uE8A5",
                     ClipKind.Image => "\uEB9F",
                     _ => "\uE8E4",
-                };
-                return new TextBlock
-                {
-                    Text = glyph,
-                    FontSize = 14,
-                    Foreground = tint.Brush(),
-                    Style = (Style)Application.Current.FindResource("Purrch.Glyph"),
-                };
+                }, tint);
         }
     }
 
-    /// The icon Explorer shows for a file or folder.
-    private static ImageSource? FileIcon(string path)
+    private static TextBlock Glyph(string glyph, Color tint) => new()
     {
-        try
-        {
-            if (!File.Exists(path)) return null;
-            using var icon = System.Drawing.Icon.ExtractAssociatedIcon(path);
-            if (icon == null) return null;
-            var source = Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-            source.Freeze();
-            return source;
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            return null;
-        }
-    }
+        Text = glyph,
+        FontSize = 14,
+        Foreground = tint.Brush(),
+        Style = (Style)Application.Current.FindResource("Purrch.Glyph"),
+    };
 }

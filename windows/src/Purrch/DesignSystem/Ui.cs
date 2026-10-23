@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -193,6 +194,39 @@ public static class Ui
             });
         };
         return box;
+    }
+
+    /// One line of text that trims the middle of a long name to fit its width ("Screenshot 20…12.png"),
+    /// so the start and the extension stay visible, like the Mac's truncationMode(.middle).
+    public static TextBlock MiddleTrimmed(string text, double size = 12, string colour = ThemeResources.Text,
+                                          FontWeight? weight = null)
+    {
+        var block = Text(text, size, colour, weight);
+        block.TextWrapping = TextWrapping.NoWrap;
+        // Stretched, the block is as wide as its slot whatever the text, so re-trimming can't loop.
+        block.SizeChanged += (_, e) =>
+        {
+            if (e.WidthChanged) block.Text = MiddleTrim(text, size, block.ActualWidth, block.FontWeight, block.FontFamily);
+        };
+        return block;
+    }
+
+    /// Cuts the middle out of a long name ("Screenshot 20…12.png") until it fits the width.
+    public static string MiddleTrim(string text, double size, double width, FontWeight? weight = null, FontFamily? family = null)
+    {
+        var typeface = new Typeface(family ?? new FontFamily("Segoe UI"), FontStyles.Normal, weight ?? FontWeights.Normal, FontStretches.Normal);
+        double Measure(string s) => new FormattedText(s, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            typeface, size, Brushes.Black, 1.0).WidthIncludingTrailingWhitespace;
+        if (Measure(text) <= width) return text;
+        var keep = text.Length - 1;
+        while (keep > 2)
+        {
+            var head = (keep + 1) / 2;
+            var candidate = text[..head] + "…" + text[^(keep - head)..];
+            if (Measure(candidate) <= width) return candidate;
+            keep--;
+        }
+        return "…";
     }
 
     /// Lays a grey placeholder over a text box while it is empty.

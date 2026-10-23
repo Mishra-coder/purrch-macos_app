@@ -121,11 +121,14 @@ None of this has run on a real Windows machine yet. Please go through the list a
 
 **Clipboard**
 
-- [ ] Copying text, a link, a file in File Explorer and a screenshot (Win+Shift+S) each adds a row with the right icon, tag, size, app name and time.
+- [ ] Copying text, a link, a file in File Explorer and a screenshot (Win+Shift+S) each adds a row with the right icon, tag, size, app name and time. Tags are coloured by type, the same as on Shelf (PDF red, ZIP yellow, Folder blue, Link green). A copied folder shows File Explorer's folder icon.
+- [ ] A long file name is shortened in the middle ("Screenshot 20…12.png"), so its extension stays visible.
+- [ ] Right-click a picture in Edge or Chrome, **Copy image**, on a PNG with a transparent background: the row's thumbnail and a paste into PowerPoint keep the transparency.
+- [ ] Something that puts only a link on the clipboard, without text (the UniformResourceLocatorW format), still adds a Link row.
 - [ ] Copying the same thing again moves it to the top instead of adding a duplicate.
-- [ ] Clicking a row copies it back (a "Copied" mark appears) and Ctrl+V pastes it in another app, including files and images. That copy doesn't add a new row.
-- [ ] Search filters as you type. The pin keeps a row at the top. The bin clears everything that isn't pinned.
-- [ ] Right-click shows Copy, Pin, Show in File Explorer (files), Open Link (links) and Delete. The panel stays open while the menu is open.
+- [ ] Clicking a row copies it back (a "Copied" mark fades in, then fades out) and Ctrl+V pastes it in another app, including files and images. That copy doesn't add a new row. A link copied back pastes as its address everywhere, and also carries the link format browsers use (UniformResourceLocatorW).
+- [ ] Search filters as you type. The pin keeps a row at the top. The bin fades out everything that isn't pinned, then clears it.
+- [ ] Right-click shows Copy, Pin, Show in File Explorer (files), Open Link (links) and Delete. The panel stays open while the menu is open. For several files copied together, Show in File Explorer selects all of them.
 - [ ] Dragging a row into Notepad, a chat box or a folder drops the text, file or image.
 - [ ] A password copied from a password manager (Bitwarden, 1Password, KeePass) is **not** recorded.
 
