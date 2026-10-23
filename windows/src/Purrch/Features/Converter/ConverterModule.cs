@@ -1,5 +1,8 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -42,6 +45,8 @@ public sealed class ConverterModule : Grid
     private readonly TextBlock _qualityText = Ui.Text("", 12, weight: FontWeights.SemiBold).Tabular();
     private readonly ContentControl _convertHost = new() { Margin = new Thickness(8, 0, 0, 0) };
     private readonly ContentControl _results = new();
+    // Results already on screen; new ones spring in.
+    private readonly HashSet<Guid> _shown = new(Results.Select(r => r.Id));
     private bool _targeted;
 
     public ConverterModule()
@@ -307,15 +312,26 @@ public sealed class ConverterModule : Grid
             return;
         }
         var list = new StackPanel();
-        foreach (var result in Results) list.Children.Add(new ResultRow(result) { Margin = new Thickness(0, 0, 0, 6) });
+        foreach (var result in Results)
+        {
+            var row = new ResultRow(result) { Margin = new Thickness(0, 0, 0, 6) };
+            if (_shown.Add(result.Id)) row.PopIn();
+            list.Children.Add(row);
+        }
         _results.Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Content = list };
     }
 
     // MARK: - Actions
 
-    private void Add(IEnumerable<string> paths)
+    /// Takes anything Windows can decode: the usual extensions at once, other files (RAW, PSD) once a quick
+    /// look at their header, off the UI thread, finds a codec for them.
+    private async void Add(IEnumerable<string> paths)
     {
-        foreach (var path in paths.Where(p => ImageConverter.IsImage(p) && File.Exists(p)))
+        var candidates = paths.ToList();
+        var images = await Task.Run(() => candidates
+            .Where(p => File.Exists(p) && (ImageConverter.IsImage(p) || ImageConverter.CanRead(p)))
+            .ToList());
+        foreach (var path in images)
             if (!Inputs.Contains(path, StringComparer.OrdinalIgnoreCase)) Inputs.Add(path);
         RefreshInputs();
         RefreshConvert();
@@ -367,9 +383,11 @@ public sealed class ConverterModule : Grid
     }
 }
 
-/// Quality from 10% to 100%: click or drag along the track.
+/// Quality from 10% to 100%: click or drag along the track, or focus it and use the arrow keys (1%), Page Up and
+/// Page Down (10%), Home and End, or the mouse wheel (5% a notch). Screen readers see a slider.
 internal sealed class QualitySlider : Grid
 {
+    private const double Minimum = 0.1, Maximum = 1;
     private readonly Border _fill = new() { CornerRadius = new CornerRadius(2), Height = 4, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
     private readonly Border _knob = new() { Width = 14, Height = 14, CornerRadius = new CornerRadius(7), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
     private readonly Action<double> _changed;
@@ -385,20 +403,49 @@ internal sealed class QualitySlider : Grid
         Height = 20;
         Background = Brushes.Transparent;
         Cursor = Cursors.Hand;
+        Focusable = true;
+        // The knob shows focus with an accent ring instead of the dotted rectangle.
+        FocusVisualStyle = null;
+        AutomationProperties.SetName(this, "Quality");
         var track = new Border { CornerRadius = new CornerRadius(2), Height = 4, VerticalAlignment = VerticalAlignment.Center };
         track.SetResourceReference(Border.BackgroundProperty, ThemeResources.Fill);
         _fill.SetResourceReference(Border.BackgroundProperty, ThemeResources.Accent);
         _knob.SetResourceReference(Border.BackgroundProperty, ThemeResources.Text);
+        _knob.SetResourceReference(Border.BorderBrushProperty, ThemeResources.Accent);
         _knob.Effect = new System.Windows.Media.Effects.DropShadowEffect { Color = Colors.Black, Opacity = 0.4, BlurRadius = 4, ShadowDepth = 0 };
         Children.Add(track);
         Children.Add(_fill);
         Children.Add(_knob);
 
+        IsKeyboardFocusedChanged += (_, _) => _knob.BorderThickness = new Thickness(IsKeyboardFocused ? 2 : 0);
         MouseLeftButtonDown += (_, e) =>
         {
+            Focus();
             CaptureMouse();
             _dragging = true;
             Move(e);
+            e.Handled = true;
+        };
+        MouseWheel += (_, e) =>
+        {
+            if (!IsEnabled) return;
+            Step(e.Delta / 120.0 * 0.05);
+            e.Handled = true;
+        };
+        KeyDown += (_, e) =>
+        {
+            double? step = e.Key switch
+            {
+                Key.Right or Key.Up => 0.01,
+                Key.Left or Key.Down => -0.01,
+                Key.PageUp => 0.1,
+                Key.PageDown => -0.1,
+                Key.Home => -1,
+                Key.End => 1,
+                _ => null,
+            };
+            if (step is not { } delta) return;
+            Step(delta);
             e.Handled = true;
         };
         MouseMove += (_, e) => { if (_dragging) Move(e); };
@@ -413,21 +460,67 @@ internal sealed class QualitySlider : Grid
         SizeChanged += (_, _) => Layout();
     }
 
+    public double Value => _value;
+
     private void Move(MouseEventArgs e)
     {
         var usable = Math.Max(1, ActualWidth - _knob.Width);
         var fraction = Math.Clamp((e.GetPosition(this).X - _knob.Width / 2) / usable, 0, 1);
-        _value = Math.Round((0.1 + fraction * 0.9) * 100) / 100;
+        SetQuality(Minimum + fraction * (Maximum - Minimum), commit: false);
+    }
+
+    private void Step(double delta) => SetQuality(_value + delta, commit: true);
+
+    /// Rounds to whole percent, moves the knob and reports the change; keys, the wheel and screen readers
+    /// also save it straight away, a drag only when it ends.
+    internal void SetQuality(double value, bool commit)
+    {
+        var rounded = Math.Round(Math.Clamp(value, Minimum, Maximum) * 100) / 100;
+        if (rounded == _value) return;
+        var old = _value;
+        _value = rounded;
         Layout();
         _changed(_value);
+        if (commit) _committed();
+        if (UIElementAutomationPeer.FromElement(this) is { } peer)
+            peer.RaisePropertyChangedEvent(RangeValuePatternIdentifiers.ValueProperty, old * 100, _value * 100);
     }
 
     private void Layout()
     {
         var usable = Math.Max(0, ActualWidth - _knob.Width);
-        var x = usable * (_value - 0.1) / 0.9;
+        var x = usable * (_value - Minimum) / (Maximum - Minimum);
         _fill.Width = x + _knob.Width / 2;
         _knob.Margin = new Thickness(x, 0, 0, 0);
+    }
+
+    protected override AutomationPeer OnCreateAutomationPeer() => new QualitySliderPeer(this);
+
+    /// Presents the slider to Narrator and other assistive tools as a 10 to 100 range.
+    private sealed class QualitySliderPeer : FrameworkElementAutomationPeer, IRangeValueProvider
+    {
+        private readonly QualitySlider _slider;
+
+        public QualitySliderPeer(QualitySlider slider) : base(slider) => _slider = slider;
+
+        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Slider;
+        protected override string GetClassNameCore() => nameof(QualitySlider);
+        protected override bool IsKeyboardFocusableCore() => true;
+        public override object? GetPattern(PatternInterface pattern) =>
+            pattern == PatternInterface.RangeValue ? this : base.GetPattern(pattern);
+
+        public double Value => Math.Round(_slider.Value * 100);
+        public double Minimum => QualitySlider.Minimum * 100;
+        public double Maximum => QualitySlider.Maximum * 100;
+        public double SmallChange => 1;
+        public double LargeChange => 10;
+        public bool IsReadOnly => !_slider.IsEnabled;
+
+        public void SetValue(double value)
+        {
+            if (!_slider.IsEnabled) throw new ElementNotEnabledException();
+            _slider.SetQuality(value / 100, commit: true);
+        }
     }
 }
 
@@ -458,11 +551,18 @@ internal sealed class ResultRow : ListRow
             FileUi.DragOut(this, () => File.Exists(file) ? FileMeta.DragData(new[] { file }) : null);
             ToolTip = file;
         }
+        else if (result.Error == ImageConverter.HevcMissing)
+        {
+            var store = Ui.Pill("Get HEVC", "\uE719", () => FileMeta.Open(ImageConverter.HevcStoreLink));
+            store.VerticalAlignment = VerticalAlignment.Center;
+            store.Margin = new Thickness(6, 0, 0, 0);
+            store.ToolTip = "HEVC Video Extensions from Device Manufacturer, free in the Microsoft Store";
+            DockPanel.SetDock(store, Dock.Right);
+            layout.Children.Add(store);
+        }
 
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        var name = Ui.Text(System.IO.Path.GetFileName(result.Output ?? result.Sources.FirstOrDefault() ?? ""), 12, weight: FontWeights.SemiBold);
-        name.TextWrapping = TextWrapping.NoWrap;
-        name.TextTrimming = TextTrimming.CharacterEllipsis;
+        var name = new MiddleTrimmedText(System.IO.Path.GetFileName(result.Output ?? result.Sources.FirstOrDefault() ?? ""), 12);
         text.Children.Add(name);
         if (result.Error is { } error)
         {

@@ -4,11 +4,15 @@ using System.Text;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Purrch.Core;
+using Windows.Foundation;
+using Windows.Storage.Streams;
+using WinImaging = Windows.Graphics.Imaging;
 
 namespace Purrch.Features.Converter;
 
-/// Output formats. The Mac app's HEIC is left out: WPF can read HEIC (with Microsoft's HEIF extension) but can't write it.
-public enum ConvertFormat { Jpeg, Png, Tiff, Bmp, Gif, Pdf }
+/// Output formats: the Mac app's JPEG, PNG, HEIC and PDF, plus the other formats Windows writes.
+/// HEIC goes through Windows' own HEIF encoder, which needs HEVC Video Extensions from the Store.
+public enum ConvertFormat { Jpeg, Png, Heic, Tiff, Bmp, Gif, Pdf }
 
 public static class ConvertFormatInfo
 {
@@ -18,6 +22,7 @@ public static class ConvertFormatInfo
     {
         ConvertFormat.Jpeg => "JPEG",
         ConvertFormat.Png => "PNG",
+        ConvertFormat.Heic => "HEIC",
         ConvertFormat.Tiff => "TIFF",
         ConvertFormat.Bmp => "BMP",
         ConvertFormat.Gif => "GIF",
@@ -28,6 +33,7 @@ public static class ConvertFormatInfo
     {
         ConvertFormat.Jpeg => "jpg",
         ConvertFormat.Png => "png",
+        ConvertFormat.Heic => "heic",
         ConvertFormat.Tiff => "tiff",
         ConvertFormat.Bmp => "bmp",
         ConvertFormat.Gif => "gif",
@@ -35,7 +41,7 @@ public static class ConvertFormatInfo
     };
 
     /// The quality slider applies (a PDF stores its pages as JPEG).
-    public static bool Lossy(this ConvertFormat f) => f is ConvertFormat.Jpeg or ConvertFormat.Pdf;
+    public static bool Lossy(this ConvertFormat f) => f is ConvertFormat.Jpeg or ConvertFormat.Heic or ConvertFormat.Pdf;
 }
 
 public sealed record ConversionResult(IReadOnlyList<string> Sources, string? Output, long Before, long After, string? Error)
@@ -49,7 +55,8 @@ public sealed record ConversionResult(IReadOnlyList<string> Sources, string? Out
 /// Every method here runs off the UI thread and returns frozen images.
 public static class ImageConverter
 {
-    /// What the file picker and drops accept. HEIC, AVIF and WebP need Microsoft's codecs from the Store.
+    /// What the file picker shows. HEIC, AVIF and WebP need Microsoft's codecs from the Store. Drops also take
+    /// any other file Windows can decode (camera RAW, PSD and so on when a codec is installed); see <see cref="CanRead"/>.
     public static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".png", ".jpg", ".jpeg", ".jpe", ".jfif", ".bmp", ".dib", ".gif", ".tif", ".tiff", ".ico",
@@ -57,6 +64,25 @@ public static class ImageConverter
     };
 
     public static bool IsImage(string path) => ImageExtensions.Contains(Path.GetExtension(path));
+
+    /// Shown with a button to the Store when HEIC can't be written.
+    public const string HevcMissing = "HEIC needs HEVC Video Extensions from the Microsoft Store.";
+    /// HEVC Video Extensions from Device Manufacturer (free).
+    public const string HevcStoreLink = "ms-windows-store://pdp/?ProductId=9NMZLZ57R3T7";
+
+    /// Whether Windows can decode the file, whatever its extension. Reads only the header.
+    public static bool CanRead(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames.Count > 0;
+        }
+        catch (Exception e) when (IsImageError(e))
+        {
+            return false;
+        }
+    }
 
     public static IReadOnlyList<ConversionResult> Convert(IReadOnlyList<string> paths, ConvertFormat format, double quality, int? maxDimension)
     {
@@ -115,6 +141,7 @@ public static class ImageConverter
         var sources = new[] { path };
         var image = LoadImage(path, maxDimension);
         if (image == null) return new(sources, null, before, 0, ReadError(path));
+        if (format == ConvertFormat.Heic) return ConvertHeic(path, image, quality, before);
 
         BitmapEncoder encoder;
         BitmapSource frame;
@@ -141,6 +168,71 @@ public static class ImageConverter
         return Write(output, s => encoder.Save(s))
             ? new(sources, output, before, SizeOf(output), null)
             : new(sources, null, before, 0, "Write failed");
+    }
+
+    private static ConversionResult ConvertHeic(string path, BitmapSource image, double quality, long before)
+    {
+        var sources = new[] { path };
+        if (!HeifEncoderInstalled()) return new(sources, null, before, 0, HevcMissing);
+        byte[] heic;
+        try
+        {
+            heic = EncodeHeic(image, quality);
+        }
+        catch (Exception e) when (IsImageError(e))
+        {
+            Log.Write($"Converter: {Path.GetFileName(path)} to HEIC failed (0x{e.HResult:X8}): {e.Message}");
+            // The HEIF encoder is there but the HEVC codec it hands the pixels to isn't, almost always.
+            return new(sources, null, before, 0, e is OutOfMemoryException ? "Image too large" : HevcMissing);
+        }
+        var output = UniquePath(path, "-converted", ConvertFormat.Heic.Extension());
+        return Write(output, s => s.Write(heic))
+            ? new(sources, output, before, SizeOf(output), null)
+            : new(sources, null, before, 0, "Write failed");
+    }
+
+    /// Windows lists the HEIF encoder with HEIF Image Extensions installed (built into Windows 11).
+    private static bool HeifEncoderInstalled()
+    {
+        try
+        {
+            return WinImaging.BitmapEncoder.GetEncoderInformationEnumerator().Any(i => i.CodecId == WinImaging.BitmapEncoder.HeifEncoderId);
+        }
+        catch (Exception e) when (IsImageError(e))
+        {
+            return false;
+        }
+    }
+
+    /// HEIC through WinRT imaging, with the quality slider as the encoder's ImageQuality. Flattened onto white:
+    /// the photo-style HEIC Windows writes has no transparency.
+    private static byte[] EncodeHeic(BitmapSource image, double quality)
+    {
+        var bgra = new FormatConvertedBitmap(OnWhite(image), PixelFormats.Bgra32, null, 0);
+        int width = bgra.PixelWidth, height = bgra.PixelHeight;
+        var stride = checked(width * 4);
+        var pixels = new byte[checked(stride * height)];
+        bgra.CopyPixels(pixels, stride, 0);
+        return EncodeHeicAsync(pixels, width, height, Dpi(image.DpiX), Dpi(image.DpiY), quality).GetAwaiter().GetResult();
+    }
+
+    private static async Task<byte[]> EncodeHeicAsync(byte[] pixels, int width, int height, double dpiX, double dpiY, double quality)
+    {
+        using var stream = new InMemoryRandomAccessStream();
+        var options = new WinImaging.BitmapPropertySet
+        {
+            ["ImageQuality"] = new WinImaging.BitmapTypedValue((float)Math.Clamp(quality, 0, 1), PropertyType.Single),
+        };
+        var encoder = await WinImaging.BitmapEncoder.CreateAsync(WinImaging.BitmapEncoder.HeifEncoderId, stream, options);
+        encoder.SetPixelData(WinImaging.BitmapPixelFormat.Bgra8, WinImaging.BitmapAlphaMode.Ignore,
+            (uint)width, (uint)height, dpiX, dpiY, pixels);
+        await encoder.FlushAsync();
+
+        var bytes = new byte[stream.Size];
+        using var reader = new DataReader(stream.GetInputStreamAt(0));
+        await reader.LoadAsync((uint)stream.Size);
+        reader.ReadBytes(bytes);
+        return bytes;
     }
 
     private static ConversionResult MakePdf(IReadOnlyList<string> paths, double quality, int? maxDimension)

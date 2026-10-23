@@ -243,11 +243,13 @@ None of this has run on a real Windows machine yet. Please go through the list a
 **File Converter**
 
 - [ ] Clicking the dashed box opens a file picker; choosing several images shows them as thumbnails, with an x on each and **Clear**. The panel stays open while the picker is up.
-- [ ] With the panel pinned, dragging images from File Explorer onto the box highlights it and adds them. Non-image files are ignored.
-- [ ] Convert to JPEG, PNG, TIFF, BMP, GIF and PDF. Each result lands next to the original as `name-converted.ext` (`name-converted 2.ext` the second time), and opens in Photos. Several images to PDF make one `name-combined.pdf`, one page per image.
-- [ ] The quality slider changes JPEG and PDF size; it greys out for PNG, TIFF and BMP ("Lossless") and GIF ("256 colours"). Max size 1280 makes the longer side 1280 pixels; small images are never enlarged.
+- [ ] With the panel pinned, dragging images from File Explorer onto the box highlights it and adds them. Non-image files are ignored. A camera RAW file (.cr2, .nef, .arw, .dng) or another format with a codec installed (Raw Image Extension from the Store) is accepted too, even though the picker's "Images" filter doesn't list it.
+- [ ] Convert to JPEG, PNG, HEIC, TIFF, BMP, GIF and PDF. Each result lands next to the original as `name-converted.ext` (`name-converted 2.ext` the second time), and opens in Photos. Several images to PDF make one `name-combined.pdf`, one page per image.
+- [ ] HEIC: with HEVC Video Extensions installed, the result opens in Photos and a lower quality makes it smaller. Without them, the result says "HEIC needs HEVC Video Extensions from the Microsoft Store." with a **Get HEVC** button that opens the Store page for HEVC Video Extensions from Device Manufacturer.
+- [ ] The quality slider changes JPEG, HEIC and PDF size; it greys out for PNG, TIFF and BMP ("Lossless") and GIF ("256 colours"). Max size 1280 makes the longer side 1280 pixels; small images are never enlarged.
+- [ ] Click the slider (or Tab to it): an accent ring shows on the knob, Left/Right move 1%, Page Up/Down 10%, Home/End to 10% and 100%; the mouse wheel moves it 5% a notch. Narrator reads it as "Quality, slider, 80".
 - [ ] A PNG with transparency converted to JPEG has a white background, not black. A phone photo taken in portrait stays upright.
-- [ ] Each result shows before and after sizes with a green "-x%" (or orange "+x%"). **Show in folder** selects the file in File Explorer; dragging a result into a chat or folder drops the file.
+- [ ] New results spring in at the top. Each shows before and after sizes with a green "-x%" (or orange "+x%"); a long name loses its middle, not its extension. **Show in folder** selects the file in File Explorer; dragging a result into a chat or folder drops the file.
 - [ ] A HEIC or WebP file converts if Microsoft's HEIF or Webp Image Extensions are installed, and otherwise shows a clear message instead of failing silently. A renamed text file shows "Couldn't read image".
 - [ ] Format, max size and quality are remembered after restarting Purrch.
 
@@ -398,6 +400,7 @@ How it maps to the Mac app:
 - Opening the panel from the tray, a second launch or the welcome screen gives it the keyboard straight away. Opening it by hovering doesn't, because on Windows that would take focus from the app you are in; click inside first to type. When the panel closes, keyboard focus goes back to the app you were in.
 - The closed pill shows a message first, then a running timer, then a download, then music.
 - Firefox doesn't record the expected size of a download anywhere Purrch can read, so its progress is estimated and the percentage shows as "…". Chrome, Edge, Brave and Vivaldi show real progress from their history, which they update a few seconds after a download starts (the estimate covers those seconds). Other Chromium browsers (Opera, Arc, Chrome Beta) are estimated too.
+- HEIC output uses Windows' own HEIF encoder, which needs HEVC Video Extensions from the Microsoft Store (the free "from Device Manufacturer" listing, which the button opens). Without it the File Converter says so and links to the Store.
 - The Shelf follows a renamed or moved file only on the same drive (as NTFS file IDs do); moved to another drive, it drops off the shelf.
 - Dragging files onto the closed pill opens the Shelf. To drop images on the File Converter, pin the panel first: pressing the mouse in File Explorer to start the drag closes an unpinned panel.
 - The exe is not code-signed, so SmartScreen warns on first run.
