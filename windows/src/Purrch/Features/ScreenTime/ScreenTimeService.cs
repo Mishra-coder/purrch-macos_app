@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using Purrch.Core;
@@ -16,12 +17,15 @@ public sealed class ScreenTimeData
 
     /// "yyyy-MM-dd" -> app key -> seconds.
     public Dictionary<string, Dictionary<string, double>> Days { get; set; } = new();
-    /// App key (the exe name in lower case, "chrome") -> its name and exe.
+    /// App key -> its name and exe. Store apps are keyed by their app ID ("Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"),
+    /// other apps by the exe's full path, so two different python.exe stay apart. Older files used the exe name in
+    /// lower case ("chrome"); those keys are moved over when the path is known, and otherwise still show as they are.
     public Dictionary<string, App> Apps { get; set; } = new();
 }
 
 /// Tracks how long each foreground app is used, per day, like Screen Time on the Mac. Time doesn't count
-/// while the session is locked, the PC sleeps, or nothing has been touched for two minutes. Keeps 7 days.
+/// while the session is locked, the display is off, the PC sleeps, or nothing has been touched for two minutes.
+/// Keeps 7 days.
 public sealed class ScreenTimeService
 {
     public static ScreenTimeService Shared { get; } = new();
@@ -31,6 +35,13 @@ public sealed class ScreenTimeService
     private const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
     private const uint WINEVENT_OUTOFCONTEXT = 0x0000;
     private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    private const int WM_POWERBROADCAST = 0x0218;
+    private const int PBT_POWERSETTINGCHANGE = 0x8013;
+    private const int DEVICE_NOTIFY_WINDOW_HANDLE = 0;
+    private const int ERROR_SUCCESS = 0;
+    private const int ERROR_INSUFFICIENT_BUFFER = 122;
+    /// GUID_CONSOLE_DISPLAY_STATE: the display went off (0), on (1) or dimmed (2).
+    private static readonly Guid ConsoleDisplayState = new("6FE69556-704A-47A0-8F24-C28D936FDA47");
 
     private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(5) };
@@ -39,14 +50,18 @@ public sealed class ScreenTimeService
     /// Kept in a field so the garbage collector doesn't free it while Windows still calls it.
     private readonly WinEventProc _onForeground;
     private IntPtr _hook;
+    /// Message-only window that receives the display on/off notifications.
+    private HwndSource? _powerWindow;
+    private IntPtr _displayNotification;
     private string? _current;
     private uint _currentPid;
     private DateTime _lastTick = DateTime.Now;
-    private bool _locked, _suspended, _started, _savePending;
+    private bool _locked, _suspended, _displayOff, _started, _savePending;
 
     private ScreenTimeService()
     {
         _data = Store.Load<ScreenTimeData>("screentime");
+        Migrate();
         _saver = new DebouncedSaver(TimeSpan.FromSeconds(30), Save);
         _timer.Tick += (_, _) => Accumulate();
         _onForeground = (_, _, hwnd, _, _, _, _) => SwitchTo(hwnd);
@@ -63,6 +78,7 @@ public sealed class ScreenTimeService
         _hook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, _onForeground, 0, 0, WINEVENT_OUTOFCONTEXT);
         SystemEvents.SessionSwitch += OnSessionSwitch;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
+        WatchDisplay();
         _timer.Start();
     }
 
@@ -77,7 +93,52 @@ public sealed class ScreenTimeService
         _hook = IntPtr.Zero;
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+        if (_displayNotification != IntPtr.Zero) UnregisterPowerSettingNotification(_displayNotification);
+        _displayNotification = IntPtr.Zero;
+        _powerWindow?.Dispose();
+        _powerWindow = null;
         _started = false;
+    }
+
+    /// Like the Mac's screensDidSleep: the screen can go dark while the session stays unlocked and a video
+    /// keeps the PC from idling, and none of that is screen time. Windows sends the current state straight away.
+    private void WatchDisplay()
+    {
+        try
+        {
+            _powerWindow = new HwndSource(new HwndSourceParameters("Purrch Screen Time")
+            {
+                WindowStyle = 0,
+                // HWND_MESSAGE: a window that only receives messages and is never shown.
+                ParentWindow = new IntPtr(-3),
+            });
+            _powerWindow.AddHook(OnPowerMessage);
+            var guid = ConsoleDisplayState;
+            _displayNotification = RegisterPowerSettingNotification(_powerWindow.Handle, ref guid, DEVICE_NOTIFY_WINDOW_HANDLE);
+            if (_displayNotification == IntPtr.Zero) Log.Write($"Screen Time display watch failed: {Marshal.GetLastWin32Error()}");
+        }
+        catch (Exception e)
+        {
+            Log.Write($"Screen Time display watch failed: {e.Message}");
+        }
+    }
+
+    private IntPtr OnPowerMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg != WM_POWERBROADCAST || wParam.ToInt32() != PBT_POWERSETTINGCHANGE || lParam == IntPtr.Zero) return IntPtr.Zero;
+        // POWERBROADCAST_SETTING: the setting's GUID, the data length, then the data (a DWORD here).
+        var setting = Marshal.PtrToStructure<Guid>(lParam);
+        if (setting != ConsoleDisplayState) return IntPtr.Zero;
+        var state = Marshal.ReadInt32(lParam, 20);
+        SetDisplay(off: state == 0);
+        handled = true;
+        return new IntPtr(1);
+    }
+
+    private void SetDisplay(bool off)
+    {
+        Accumulate();
+        _displayOff = off;
     }
 
     // SystemEvents raise on their own thread; the totals belong to the UI thread.
@@ -115,7 +176,7 @@ public sealed class ScreenTimeService
     {
         get
         {
-            if (_locked || _suspended) return false;
+            if (_locked || _suspended || _displayOff) return false;
             var info = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
             if (!GetLastInputInfo(ref info)) return true;
             // Both are milliseconds since boot in 32 bits; unsigned subtraction survives the 49-day wrap.
@@ -179,9 +240,10 @@ public sealed class ScreenTimeService
         string key, name;
         if (path != null)
         {
-            key = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
+            // Store apps by their app ID, which survives updates that move the exe to a new versioned folder.
+            key = AppUserModelId(pid) ?? path;
             if (_data.Apps.TryGetValue(key, out var known) && known.Path == path) return key;
-            name = FriendlyName(path);
+            name = known?.Name ?? FriendlyName(path);
         }
         else
         {
@@ -200,6 +262,54 @@ public sealed class ScreenTimeService
         }
         _data.Apps[key] = new ScreenTimeData.App(name, path);
         return key;
+    }
+
+    /// Moves old exe-name keys ("chrome") to the exe's full path, merging their seconds. Store apps' old keys can't
+    /// be turned into app IDs without the app running, so they stay under the old key and still show.
+    private void Migrate()
+    {
+        var changed = false;
+        foreach (var (old, app) in _data.Apps.ToList())
+        {
+            if (!IsLegacyKey(old) || app.Path is not { Length: > 0 } path || IsPackaged(path)) continue;
+            changed = true;
+            _data.Apps.Remove(old);
+            _data.Apps.TryAdd(path, app);
+            foreach (var day in _data.Days.Values)
+            {
+                if (!day.Remove(old, out var seconds)) continue;
+                day[path] = day.GetValueOrDefault(path) + seconds;
+            }
+        }
+        if (changed) Store.Save("screentime", _data);
+    }
+
+    /// Exe names had neither a folder (paths do) nor a "!" (app IDs do).
+    private static bool IsLegacyKey(string key) => !key.Contains('\\') && !key.Contains('!');
+
+    private static bool IsPackaged(string path) =>
+        path.Contains(@"\WindowsApps\", StringComparison.OrdinalIgnoreCase) || path.Contains(@"\SystemApps\", StringComparison.OrdinalIgnoreCase);
+
+    /// The app ID of a Store (packaged) app's process; null for ordinary desktop apps.
+    private static string? AppUserModelId(uint pid)
+    {
+        var handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (handle == IntPtr.Zero) return null;
+        try
+        {
+            uint length = 0;
+            if (GetApplicationUserModelId(handle, ref length, null) != ERROR_INSUFFICIENT_BUFFER || length == 0) return null;
+            var buffer = new StringBuilder((int)length);
+            return GetApplicationUserModelId(handle, ref length, buffer) == ERROR_SUCCESS && buffer.Length > 0 ? buffer.ToString() : null;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return null;
+        }
+        finally
+        {
+            CloseHandle(handle);
+        }
     }
 
     private static uint? HostedProcess(IntPtr frame, uint framePid)
@@ -310,4 +420,13 @@ public sealed class ScreenTimeService
 
     [DllImport("kernel32.dll")]
     private static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetApplicationUserModelId(IntPtr process, ref uint length, StringBuilder? id);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr RegisterPowerSettingNotification(IntPtr recipient, ref Guid powerSetting, int flags);
+
+    [DllImport("user32.dll")]
+    private static extern bool UnregisterPowerSettingNotification(IntPtr handle);
 }

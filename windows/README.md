@@ -259,9 +259,12 @@ None of this has run on a real Windows machine yet. Please go through the list a
 
 - [ ] After a few minutes of normal use, "Top apps today" lists the apps you used with their File Explorer icon, a friendly name ("Google Chrome", "Visual Studio Code", "File Explorer"), the time, and a bar relative to the top app. The header says how many apps.
 - [ ] Store apps (Settings, Calculator, Photos) are counted as themselves, not as "Application Frame Host".
+- [ ] Two different `python.exe` (say from two virtual environments, or a Store and a python.org install) are listed separately.
+- [ ] After updating from an older build, apps already in `screentime.json` keep today's time instead of starting again from zero, and nothing is lost from earlier days.
 - [ ] The big total and today's bar grow while the panel stays open on Screen Time (it updates every 5 seconds). Switching between two apps for a minute each splits the time between them.
 - [ ] Leave the PC untouched for more than 2 minutes, or lock it with Win+L: that time is not counted. Watching a video without touching anything also stops counting after 2 minutes, as on the Mac.
 - [ ] Sleep and wake the PC: the time asleep is not counted.
+- [ ] Let the display turn off (Settings → System → Power, screen off after 1 minute) while a video keeps the PC awake, or press the monitor's own power-saving shortcut: the time with the screen dark is not counted.
 - [ ] The week chart shows seven bars with weekday letters, today's in the full accent, hour lines and labels on the right, and "Avg" in the header is the average of the days that have any time.
 - [ ] Quit from the tray and reopen: today's numbers are still there. On a new day the list starts empty and yesterday's bar stays. Days older than a week drop off.
 - [ ] Task Manager shows Purrch's CPU at about zero while it tracks in the background.
@@ -369,7 +372,7 @@ How it maps to the Mac app:
 - Dragging files onto the closed pill opens the Shelf. To drop images on the File Converter, pin the panel first: pressing the mouse in File Explorer to start the drag closes an unpinned panel.
 - The exe is not code-signed, so SmartScreen warns on first run.
 - Calendar reads iCal links and .ics files, so it shows events but can't change them, and a published link can lag Google or Outlook by a few hours. Windows' own calendar store needs a packaged (MSIX) app.
-- Screen Time counts the app in front, so a window you are only reading or watching counts until the 2-minute idle limit, as on the Mac. Apps are grouped by exe name, so two different `python.exe` show as one.
+- Screen Time counts the app in front, so a window you are only reading or watching counts until the 2-minute idle limit, as on the Mac. Store apps are grouped by their app ID and other apps by the exe's full path. Store apps recorded by an older build stay under their old exe-name entry for the days already recorded.
 - Windows doesn't tell apps how hot the machine is, so System's **Thermal** row is estimated from CPU throttling (how far the processor's speed limit, or its speed under load, sits below its maximum). It never says Critical, and a PC that throttles for power rather than heat shows the same.
 - The battery cycle count comes from the battery driver through WMI; many drivers don't keep one, and then it shows "—".
 - Claude Code reads only `%USERPROFILE%\.claude\projects`, as the Mac app reads `~/.claude/projects`; a `CLAUDE_CONFIG_DIR` set elsewhere isn't followed. A transcript line still being written is counted on the next read, a minute later.
