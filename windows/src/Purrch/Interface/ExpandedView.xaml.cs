@@ -165,6 +165,7 @@ public partial class ExpandedView : UserControl
         if (_state.ShowSettings) return new SettingsView();
         return _state.Selected switch
         {
+            ModuleId.Home => new Features.Insights.HomeModule(),
             ModuleId.Timers => new Features.Timers.TimersModule(),
             ModuleId.Clipboard => new Features.Clipboard.ClipboardModule(),
             ModuleId.Notes => new Features.Notes.NotesModule(),

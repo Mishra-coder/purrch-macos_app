@@ -18,8 +18,9 @@ The project builds on macOS, but the app only runs on Windows 10 (1809 or later)
 | 8 | Emoji, Units, Links, Shelf, Captures, File Converter, Downloads, Message, Ambience, Calendar, Weather | Done; not yet run on Windows |
 | 9 | Screen Time and Claude Code | Done; not yet run on Windows |
 | 10 | Revenue (Stripe) and Analytics (Plausible), with your own key | Done; not yet run on Windows |
+| 11 | Home (greeting, clock, battery, weather and next event, system rings, app launcher, now playing) | Done; not yet run on Windows |
 
-All 24 modules from the Mac app are in the tab bar. Home is not built yet and shows a "Coming soon" card.
+All 24 modules from the Mac app are in the tab bar and built.
 
 ## Build on a Mac
 
@@ -82,6 +83,17 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Each of the six themes recolours the panel at once. Playful gives each module its own colour.
 - [ ] Settings → Modules: turning modules off removes them from the tab bar, and **Reset order** works. Home can't be turned off.
 - [ ] Settings → Behaviour: with **Open on hover** off, the panel only opens on click.
+
+**Home**
+
+- [ ] Home shows "Good morning" (afternoon, evening, night) and the time in large digits, with AM/PM beside it on a 12-hour clock and without it on a 24-hour clock. The time ticks over on the minute.
+- [ ] The battery chip shows the level and Charging / Plugged in / Battery, green while charging and red below 20%; on a desktop or VM it shows "AC". Clicking it opens System.
+- [ ] The weather chip shows the temperature with a colour icon and the town (or "--" before the first forecast); clicking it opens Weather. Changing **Fahrenheit** in Settings updates it.
+- [ ] With no calendars, the event chip says "Connect" and opens Calendar. With one, it shows the next event's title and "in 25m", "in 2h 5m", "in 1d" or "Now", in the calendar's colour; with nothing coming up it says "Free".
+- [ ] System shows CPU, RAM and Disk rings that match the System module; clicking the card opens System.
+- [ ] Launch shows Edge, File Explorer, Notepad, Calculator, PowerShell and Settings with their icons (an app that isn't installed is left out). Hovering grows an icon and shows its name; clicking opens the app and closes the panel. Right-click offers Open, Show in File Explorer and Remove from Launch.
+- [ ] The dashed + opens a file picker in the Start menu's Programs folder with the panel staying open; picking shortcuts or .exe files adds them, and the list is the same after restarting Purrch.
+- [ ] Now Playing shows the artwork, title and artist with previous, play/pause and next while something plays, and "Nothing playing" otherwise. The arrow opens the Now Playing module.
 
 **Timers**
 
@@ -277,6 +289,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | What | Where |
 | --- | --- |
 | Settings | `%APPDATA%\Purrch\settings.json` |
+| Home's Launch apps | `%APPDATA%\Purrch\launcher.json` |
 | Translate languages, mode and provider | `%APPDATA%\Purrch\translate.json` |
 | Timer lengths, pomodoros done, water | `%APPDATA%\Purrch\timers.json`, `water.json` |
 | Clipboard history | `%APPDATA%\Purrch\clipboard.json`, images in `clipboard-images\` |
