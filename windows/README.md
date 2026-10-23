@@ -135,6 +135,10 @@ None of this has run on a real Windows machine yet. Please go through the list a
 
 - [ ] Play a song in Spotify, a YouTube video in Edge or Chrome, and something in the Media Player app. Each shows its title, artist, artwork and app name.
 - [ ] Play/pause, previous and next control that app. Clicking or dragging along the progress bar jumps in the track (Spotify and Media Player; many websites don't allow it).
+- [ ] Clicking play/pause flips the button, the PAUSED label and the bars at once, with no flicker back while the app catches up. If the app ignores it, the button shows the real state again after about a second.
+- [ ] The artwork springs slightly smaller on pause and back to full size on play.
+- [ ] The wide equaliser at the top right moves while playing and sits low and still when paused. With the panel closed or on another module, Purrch's CPU in Task Manager drops back (it only animates while visible).
+- [ ] Pause Spotify, then play a YouTube video: the module switches to the video even if Windows still treats Spotify as current, and the controls act on the video.
 - [ ] While music plays, the closed pill shows the artwork on the left and moving bars on the right. A running timer takes priority over music.
 - [ ] With nothing playing, the module says "Nothing playing".
 

@@ -15,9 +15,13 @@ public sealed class NowPlayingService
 
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
     private GlobalSystemMediaTransportControlsSession? _session;
+    /// Every session Windows knows about, watched so a player that starts playing can take over.
+    private IReadOnlyList<GlobalSystemMediaTransportControlsSession> _watched = Array.Empty<GlobalSystemMediaTransportControlsSession>();
     private TimeSpan _position;
     private DateTimeOffset _positionUpdated;
     private int _refreshGeneration;
+    /// Right after a local action the app may still report the old state; ignore it until then.
+    private DateTimeOffset _suppressUntil;
 
     /// Track, play state or artwork changed.
     public event Action? Changed;
@@ -45,7 +49,8 @@ public sealed class NowPlayingService
         {
             _manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
             _manager.CurrentSessionChanged += (_, _) => OnUi(AttachCurrent);
-            _manager.SessionsChanged += (_, _) => OnUi(AttachCurrent);
+            _manager.SessionsChanged += (_, _) => OnUi(() => { WatchSessions(); AttachCurrent(); });
+            WatchSessions();
             AttachCurrent();
         }
         catch (Exception e)
@@ -68,9 +73,46 @@ public sealed class NowPlayingService
 
     private static void OnUi(Action action) => Application.Current?.Dispatcher.BeginInvoke(action);
 
+    private void WatchSessions()
+    {
+        foreach (var old in _watched) old.PlaybackInfoChanged -= OnAnyPlaybackChanged;
+        try { _watched = _manager?.GetSessions().ToList() ?? new List<GlobalSystemMediaTransportControlsSession>(); }
+        catch (Exception e)
+        {
+            Log.Write($"Now Playing sessions failed: {e.Message}");
+            _watched = Array.Empty<GlobalSystemMediaTransportControlsSession>();
+        }
+        foreach (var session in _watched) session.PlaybackInfoChanged += OnAnyPlaybackChanged;
+    }
+
+    private void OnAnyPlaybackChanged(GlobalSystemMediaTransportControlsSession s, PlaybackInfoChangedEventArgs e) =>
+        OnUi(AttachCurrent);
+
+    private static bool IsSessionPlaying(GlobalSystemMediaTransportControlsSession? session)
+    {
+        try { return session?.GetPlaybackInfo()?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing; }
+        catch (Exception) { return false; }
+    }
+
+    /// Windows' current session, unless it is paused while another one is actually playing (a paused
+    /// Spotify shouldn't hide a playing browser tab). The one already shown wins a tie, so it doesn't flicker.
+    private GlobalSystemMediaTransportControlsSession? ChooseSession()
+    {
+        var current = _manager?.GetCurrentSession();
+        if (current == null || IsSessionPlaying(current)) return current;
+        if (IsSessionPlaying(_session)) return _session;
+        return _watched.FirstOrDefault(IsSessionPlaying) ?? current;
+    }
+
     private void AttachCurrent()
     {
-        var session = _manager?.GetCurrentSession();
+        GlobalSystemMediaTransportControlsSession? session;
+        try { session = ChooseSession(); }
+        catch (Exception e)
+        {
+            Log.Write($"Now Playing session failed: {e.Message}");
+            return;
+        }
         if (ReferenceEquals(session, _session)) return;
         if (_session != null)
         {
@@ -79,6 +121,7 @@ public sealed class NowPlayingService
             _session.TimelinePropertiesChanged -= OnTimelineChanged;
         }
         _session = session;
+        _suppressUntil = default;
         if (_session != null)
         {
             _session.MediaPropertiesChanged += OnMediaChanged;
@@ -100,8 +143,11 @@ public sealed class NowPlayingService
     private void OnTimelineChanged(GlobalSystemMediaTransportControlsSession s, TimelinePropertiesChangedEventArgs e) =>
         OnUi(ReadTimeline);
 
+    private bool Suppressed => DateTimeOffset.Now < _suppressUntil;
+
     private void ReadPlayback()
     {
+        if (Suppressed) return;
         IsPlaying = _session?.GetPlaybackInfo()?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
     }
 
@@ -116,6 +162,7 @@ public sealed class NowPlayingService
             return;
         }
         Duration = Math.Max(0, (timeline.EndTime - timeline.StartTime).TotalSeconds);
+        if (Suppressed) return;
         _position = timeline.Position - timeline.StartTime;
         // Some apps report a zero LastUpdatedTime; then the position is as of now.
         _positionUpdated = timeline.LastUpdatedTime.Year > 2000 ? timeline.LastUpdatedTime : DateTimeOffset.Now;
@@ -202,11 +249,23 @@ public sealed class NowPlayingService
 
     // MARK: - Controls
 
+    /// Flips the button straight away, like the Mac app, then checks what the player really did.
     public async void TogglePlayPause()
     {
-        if (_session == null) return;
-        try { await _session.TryTogglePlayPauseAsync(); }
+        if (_session is not { } session) return;
+        _position = TimeSpan.FromSeconds(Elapsed);
+        _positionUpdated = DateTimeOffset.Now;
+        IsPlaying = !IsPlaying;
+        _suppressUntil = DateTimeOffset.Now.AddSeconds(1.2);
+        Publish();
+        try { await session.TryTogglePlayPauseAsync(); }
         catch (Exception e) { Log.Write($"Play/pause failed: {e.Message}"); }
+        // If the app ignored the command, or never reports back, show its real state once the grace period ends.
+        await Task.Delay(1300);
+        if (!ReferenceEquals(session, _session) || Suppressed) return;
+        ReadPlayback();
+        ReadTimeline();
+        Publish();
     }
 
     public async void Next()
@@ -235,6 +294,7 @@ public sealed class NowPlayingService
                 // Show the new spot right away rather than waiting for the app to report it.
                 _position = TimeSpan.FromSeconds(seconds);
                 _positionUpdated = DateTimeOffset.Now;
+                _suppressUntil = DateTimeOffset.Now.AddSeconds(1.2);
                 Changed?.Invoke();
             }
         }

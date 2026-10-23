@@ -16,6 +16,9 @@ public sealed class NowPlayingModule : ContentControl
     private readonly NowPlayingService _player = NowPlayingService.Shared;
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private Scrubber? _scrubber;
+    /// Shared by every rebuilt artwork, so play/pause springs it from where it was instead of jumping.
+    private readonly ScaleTransform _artScale = new(1, 1);
+    private bool? _artPlaying;
 
     public NowPlayingModule()
     {
@@ -30,6 +33,7 @@ public sealed class NowPlayingModule : ContentControl
         if (!_player.HasTrack)
         {
             _scrubber = null;
+            _artPlaying = null;
             Content = new Card("Now Playing", "\uE8D6",
                 Ui.EmptyState("\uE8D6", "Nothing playing", "Play something in Spotify, a browser or any media app"));
             return;
@@ -57,7 +61,8 @@ public sealed class NowPlayingModule : ContentControl
     {
         var panel = new DockPanel { Margin = new Thickness(0, 6, 0, 6) };
 
-        var top = new StackPanel { Orientation = Orientation.Horizontal };
+        var header = new DockPanel { LastChildFill = false };
+        var top = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var accent = ((SolidColorBrush)FindResource(ThemeResources.Accent)).Color;
         var tag = new Border
         {
@@ -83,8 +88,12 @@ public sealed class NowPlayingModule : ContentControl
             var paused = Ui.Text("PAUSED", 9, ThemeResources.SecondaryText, FontWeights.Bold);
             top.Children.Add(paused);
         }
-        DockPanel.SetDock(top, Dock.Top);
-        panel.Children.Add(top);
+        header.Children.Add(top);
+        var bars = new BigBars { Active = _player.IsPlaying, Width = 120, Height = 28, VerticalAlignment = VerticalAlignment.Center };
+        DockPanel.SetDock(bars, Dock.Right);
+        header.Children.Add(bars);
+        DockPanel.SetDock(header, Dock.Top);
+        panel.Children.Add(header);
 
         var controls = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
         var previous = Ui.IconButton("\uE892", 44, _player.Previous, tooltip: "Previous");
@@ -136,10 +145,22 @@ public sealed class NowPlayingModule : ContentControl
             Height = size,
             CornerRadius = new CornerRadius(18),
             Effect = new DropShadowEffect { Color = Colors.Black, Opacity = 0.5, BlurRadius = 28, ShadowDepth = 6, Direction = 270 },
-            // Slightly smaller while paused, like the Mac app.
             RenderTransformOrigin = new Point(0.5, 0.5),
-            RenderTransform = new ScaleTransform(_player.IsPlaying ? 1 : 0.94, _player.IsPlaying ? 1 : 0.94),
+            RenderTransform = _artScale,
         };
+        // Slightly smaller while paused, like the Mac app, springing between the two on play/pause.
+        var scale = _player.IsPlaying ? 1 : 0.94;
+        if (_artPlaying == null)
+        {
+            _artScale.Set(ScaleTransform.ScaleXProperty, scale);
+            _artScale.Set(ScaleTransform.ScaleYProperty, scale);
+        }
+        else if (_artPlaying != _player.IsPlaying)
+        {
+            _artScale.Animate(ScaleTransform.ScaleXProperty, scale, Motion.Pop);
+            _artScale.Animate(ScaleTransform.ScaleYProperty, scale, Motion.Pop);
+        }
+        _artPlaying = _player.IsPlaying;
         if (_player.Artwork is { } artwork)
         {
             frame.Background = new ImageBrush(artwork) { Stretch = Stretch.UniformToFill };
@@ -274,5 +295,72 @@ internal sealed class Scrubber : StackPanel
         _knob.Visibility = duration > 0 ? Visibility.Visible : Visibility.Hidden;
         _elapsed.Text = Format.Duration(elapsed);
         _remaining.Text = duration > 0 ? "-" + Format.Duration(Math.Max(0, duration - elapsed)) : "--:--";
+    }
+}
+
+/// The wide animated equaliser beside the track info: 18 capsules bobbing on a sine pattern while music
+/// plays, low and still when paused. Redraws at 20 fps, and only while playing and on screen.
+internal sealed class BigBars : FrameworkElement
+{
+    private const int Count = 18;
+    private const double Spacing = 3;
+
+    private bool _active;
+    private bool _hooked;
+    private long _lastFrame;
+
+    public BigBars()
+    {
+        Loaded += (_, _) => Hook();
+        Unloaded += (_, _) => Hook();
+        IsVisibleChanged += (_, _) => Hook();
+    }
+
+    public bool Active
+    {
+        get => _active;
+        set
+        {
+            _active = value;
+            Hook();
+            InvalidateVisual();
+        }
+    }
+
+    private void Hook()
+    {
+        var want = _active && IsLoaded && IsVisible;
+        if (want == _hooked) return;
+        _hooked = want;
+        if (want) CompositionTarget.Rendering += OnFrame;
+        else CompositionTarget.Rendering -= OnFrame;
+    }
+
+    private void OnFrame(object? sender, EventArgs e)
+    {
+        var now = Environment.TickCount64;
+        if (now - _lastFrame < 50) return;
+        _lastFrame = now;
+        InvalidateVisual();
+    }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        if (ActualWidth <= 0 || ActualHeight <= 0) return;
+        var accent = TryFindResource(ThemeResources.Accent) is SolidColorBrush brush ? brush.Color : Colors.White;
+        var t = Environment.TickCount64 / 1000.0;
+        var width = Math.Max(1, (ActualWidth - Spacing * (Count - 1)) / Count);
+        for (var i = 0; i < Count; i++)
+        {
+            double d = i;
+            // The Mac app's formula: each bar has its own speed and phase, modulated by a slow wave.
+            var h = _active
+                ? 0.18 + 0.82 * Math.Abs(Math.Sin(t * (1.6 + d % 5 * 0.55) + d * 0.9) * Math.Cos(t * 0.7 + d * 0.33))
+                : 0.12;
+            var height = Math.Max(3, ActualHeight * h);
+            var rect = new Rect(i * (width + Spacing), ActualHeight - height, width, height);
+            var radius = Math.Min(width, height) / 2;
+            dc.DrawRoundedRectangle(accent.WithOpacity(0.35 + 0.65 * h).Brush(), null, rect, radius, radius);
+        }
     }
 }
