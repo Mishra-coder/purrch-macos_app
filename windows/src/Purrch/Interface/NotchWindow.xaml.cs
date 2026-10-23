@@ -74,6 +74,22 @@ public partial class NotchWindow : Window
         var style = Native.GetWindowLongPtr(_hwnd, Native.GWL_EXSTYLE).ToInt64();
         style = (style | Native.WS_EX_TOOLWINDOW) & ~(long)Native.WS_EX_APPWINDOW;
         Native.SetWindowLongPtr(_hwnd, Native.GWL_EXSTYLE, new IntPtr(style));
+        HwndSource.FromHwnd(_hwnd)?.AddHook(OnWindowMessage);
+    }
+
+    private const int WM_SYSCOMMAND = 0x0112;
+    private const int SC_CLOSE = 0xF060;
+
+    /// Alt+F4 on the open panel quits Purrch, like Cmd+Q on the Mac, instead of closing the only
+    /// window and leaving Purrch running with no pill.
+    private IntPtr OnWindowMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_SYSCOMMAND && (wParam.ToInt64() & 0xFFF0) == SC_CLOSE)
+        {
+            handled = true;
+            Application.Current.Shutdown();
+        }
+        return IntPtr.Zero;
     }
 
     /// Top centre of the primary screen, in device-independent pixels.
