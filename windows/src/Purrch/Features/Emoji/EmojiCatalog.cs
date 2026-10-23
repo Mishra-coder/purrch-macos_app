@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using System.Windows.Media;
 using Purrch.Core;
 
 namespace Purrch.Features.Emoji;
@@ -46,6 +47,8 @@ public sealed record EmojiEntry(string Char, string Name, EmojiCategory Category
 /// windows/tools/make-emoji-catalog.sh, because .NET has no Unicode emoji data of its own.
 public static class EmojiCatalog
 {
+    private const int FirstRegionalIndicator = 0x1F1E6;
+
     private static readonly Lazy<IReadOnlyList<EmojiEntry>> Entries = new(Load);
     private static readonly Lazy<IReadOnlyDictionary<string, EmojiEntry>> ByCharLookup = new(() =>
         All.GroupBy(e => e.Char).ToDictionary(g => g.Key, g => g.First()));
@@ -62,13 +65,40 @@ public static class EmojiCatalog
             Log.Write("Emoji.tsv is missing from the build");
             return list;
         }
+        var glyphs = EmojiGlyphs();
         using var reader = new StreamReader(stream);
         while (reader.ReadLine() is { } line)
         {
             var parts = line.Split('\t');
-            if (parts.Length == 3) list.Add(new EmojiEntry(parts[0], parts[1], EmojiCategoryInfo.FromTitle(parts[2])));
+            if (parts.Length != 3 || parts[0].Length == 0) continue;
+            // Windows 10's Segoe UI Emoji predates the newest emoji; leave out what it would draw as an empty box.
+            if (glyphs != null && !glyphs.ContainsKey(char.ConvertToUtf32(parts[0], 0))) continue;
+            var category = EmojiCategoryInfo.FromTitle(parts[2]);
+            var name = category == EmojiCategory.Flags ? FlagName(parts[0], parts[1]) : parts[1];
+            list.Add(new EmojiEntry(parts[0], name, category));
         }
         return list;
+    }
+
+    /// Segoe UI Emoji's character map, or null when the font can't be read (then nothing is left out).
+    private static IDictionary<int, ushort>? EmojiGlyphs() =>
+        new Typeface("Segoe UI Emoji").TryGetGlyphTypeface(out var font) ? font.CharacterToGlyphMap : null;
+
+    /// "flag deutschland de" on a German Windows, as the Mac app names flags in the user's language.
+    /// Keeps the catalog's English name for the pride flags and for codes Windows doesn't know.
+    private static string FlagName(string flag, string name)
+    {
+        var letters = flag.EnumerateRunes().ToList();
+        if (letters.Count != 2 || letters.Any(r => r.Value is < FirstRegionalIndicator or > FirstRegionalIndicator + 25)) return name;
+        var code = string.Concat(letters.Select(r => (char)('A' + r.Value - FirstRegionalIndicator)));
+        try
+        {
+            return $"flag {new RegionInfo(code).DisplayName.ToLowerInvariant()} {code.ToLowerInvariant()}";
+        }
+        catch (ArgumentException)
+        {
+            return name;
+        }
     }
 }
 

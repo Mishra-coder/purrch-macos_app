@@ -183,6 +183,11 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] The stats count "Bring fruit, e.g. apples. Mr. Smith paid 3.5 dollars." as 2 sentences.
 - [ ] The provider capsule can use a different provider from the Assistant, including Local; a missing key shows where to add it, and pasting the key in Settings (with Translate still open behind it) brings the panes back straight away.
 
+**Emoji**
+
+- [ ] On Windows 10, no emoji in any category shows as an empty box (newer emoji that Windows 10 can't draw are left out); Windows 11 shows them all.
+- [ ] Flags: on a Windows set to another display language (e.g. German), hovering a flag shows the country in that language ("Flag Deutschland De"), and searching for it in that language finds it.
+
 **Units**
 
 - [ ] Typing "5 km to mi", "100 f in c" or "2 cups -> ml" switches the category and both units by itself and shows the result in large accent digits. A bare "5" converts with the units already picked.
