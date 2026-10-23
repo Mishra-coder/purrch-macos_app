@@ -48,6 +48,10 @@
     <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
     <!-- Reads Chrome, Edge, Brave and Vivaldi's download list for real progress. Brings e_sqlite3 for x64 and arm64. -->
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.31" />
+    <!-- Sign in with Microsoft for Calendar (Outlook calendars and To Do), through the system browser. -->
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.91.1" />
+    <!-- DPAPI, which keeps the Microsoft sign-in cache encrypted for this Windows user. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

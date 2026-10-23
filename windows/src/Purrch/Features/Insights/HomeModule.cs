@@ -177,7 +177,7 @@ public sealed class HomeModule : Grid
 
     private UIElement EventChip()
     {
-        // Windows has no calendar store Purrch can read, so "Connect" leads to adding an iCal link.
+        // Windows has no calendar store Purrch can read, so "Connect" leads to Calendar to sign in or add an iCal link.
         if (!_calendar.HasSources)
             return Chip(Ui.Glyph("\uE787", 13, ThemeResources.Accent), "Connect", "Calendar", () => Go(ModuleId.Calendar));
         if (_calendar.NextEvent is { } e)

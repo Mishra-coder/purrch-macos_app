@@ -71,7 +71,7 @@ public sealed class CalendarModule : Grid
             _agendaAccessory.Content = AccentButton("Add calendar", OpenEditor);
             var empty = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             empty.Children.Add(Ui.EmptyState("\uE787", "No calendars connected",
-                "Add the iCal link of a Google, Outlook or iCloud calendar, or an .ics file."));
+                "Sign in with Microsoft or Google, or add an iCal link or an .ics file."));
             var pill = Ui.Pill("Add calendar", "\uE710", OpenEditor, prominent: true);
             pill.HorizontalAlignment = HorizontalAlignment.Center;
             pill.Margin = new Thickness(0, 12, 0, 0);
@@ -90,9 +90,13 @@ public sealed class CalendarModule : Grid
 
         if (_service.Events.Count == 0)
         {
-            var failing = _service.Sources.Select(_service.Error).FirstOrDefault(e => e != null);
+            // Every calendar and signed-in account failing means there is nothing to trust, not a clear week.
+            var errors = _service.Sources.Select(_service.Error)
+                .Concat(_service.Accounts.Where(a => _service.Email(a.Kind) != null).Select(a => _service.AccountError(a.Kind)))
+                .ToList();
+            var failing = errors.FirstOrDefault(e => e != null);
             _agenda.Content = _service.IsLoading ? Ui.EmptyState("\uE787", "Loading calendars…", "")
-                : failing != null && _service.Sources.All(s => _service.Error(s) != null)
+                : failing != null && errors.All(e => e != null)
                     ? Ui.EmptyState("\uE7BA", "Couldn't load your calendars", failing)
                     : Ui.EmptyState("\uE73E", "Nothing scheduled", "Your week is clear");
             return;
@@ -292,13 +296,22 @@ internal sealed class ReminderRow : DockPanel
         text.Children.Add(_title);
         if (item.Due is { } due)
         {
-            var when = Ui.Text($"{due.ToString("ddd", CultureInfo.CurrentCulture)} {due.ToString("t", CultureInfo.CurrentCulture)}", 10,
-                ThemeResources.SecondaryText).Tabular();
-            if (due < DateTime.Now) when.Foreground = Color.FromRgb(0xFF, 0x45, 0x3A).Brush();
+            // To Do and Google Tasks keep only the day, which is overdue once it has passed.
+            var label = item.DueIsDate ? DueDay(due)
+                : $"{due.ToString("ddd", CultureInfo.CurrentCulture)} {due.ToString("t", CultureInfo.CurrentCulture)}";
+            var when = Ui.Text(label, 10, ThemeResources.SecondaryText).Tabular();
+            if (item.DueIsDate ? due.Date < DateTime.Today : due < DateTime.Now) when.Foreground = Color.FromRgb(0xFF, 0x45, 0x3A).Brush();
             when.Margin = new Thickness(0, 1, 0, 0);
             text.Children.Add(when);
         }
         Children.Add(text);
+    }
+
+    private static string DueDay(DateTime due)
+    {
+        if (due.Date == DateTime.Today) return "Today";
+        if (due.Date == DateTime.Today.AddDays(1)) return "Tomorrow";
+        return due.ToString("ddd d MMM", CultureInfo.CurrentCulture);
     }
 
     private void Paint(bool hover)
@@ -316,7 +329,7 @@ internal sealed class ReminderRow : DockPanel
     }
 }
 
-/// The card for adding and removing calendars, shown over the dimmed module.
+/// The card for adding and removing calendars and signing in to accounts, shown over the dimmed module.
 internal sealed class CalendarsEditor : Border
 {
     private readonly CalendarService _service;
@@ -342,7 +355,7 @@ internal sealed class CalendarsEditor : Border
         stack.Children.Add(new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Hidden,
-            MaxHeight = 74,
+            MaxHeight = 116,
             Margin = new Thickness(0, 8, 0, 0),
             Content = _list,
         });
@@ -403,14 +416,16 @@ internal sealed class CalendarsEditor : Border
         Loaded += (_, _) => _input.Focus();
     }
 
-    /// Lists the calendars with their colour, where they come from and any problem.
+    /// Lists the accounts with their calendars and a switch for each, then the iCal calendars with their
+    /// colour, where they come from and any problem.
     public void Refresh()
     {
         _list.Children.Clear();
-        if (_service.Sources.Count == 0)
+        foreach (var account in _service.Accounts)
         {
-            _list.Children.Add(Ui.Text("No calendars yet.", 12, ThemeResources.SecondaryText));
-            return;
+            _list.Children.Add(new AccountRow(_service, account, compact: true) { Margin = new Thickness(0, 0, 0, 6) });
+            foreach (var calendar in _service.CalendarsOf(account.Kind))
+                _list.Children.Add(AccountCalendarRow(account.Kind, calendar));
         }
         foreach (var source in _service.Sources)
         {
@@ -441,6 +456,37 @@ internal sealed class CalendarsEditor : Border
             row.Children.Add(text);
             _list.Children.Add(row);
         }
+    }
+
+    /// A calendar or task list in a signed-in account, with a switch to leave it out of Purrch.
+    private UIElement AccountCalendarRow(AccountKind kind, AccountCalendar calendar)
+    {
+        var row = new DockPanel { Margin = new Thickness(20, 0, 0, 6) };
+        var dot = new Border { Width = 10, Height = 10, CornerRadius = new CornerRadius(5), Margin = new Thickness(0, 0, 10, 0) };
+        dot.Background = (_service.ColourOf(calendar.Key) ?? Colors.Gray).Brush();
+        DockPanel.SetDock(dot, Dock.Left);
+        row.Children.Add(dot);
+
+        var target = calendar;
+        var toggle = Ui.Switch(!_service.IsHidden(kind, calendar), on => _service.SetHidden(kind, target, !on));
+        toggle.Margin = new Thickness(8, 0, 0, 0);
+        toggle.ToolTip = "Show in Purrch";
+        DockPanel.SetDock(toggle, Dock.Right);
+        row.Children.Add(toggle);
+
+        if (calendar.IsTaskList)
+        {
+            var tag = Ui.Text("Tasks", 10, ThemeResources.SecondaryText);
+            tag.Margin = new Thickness(8, 0, 0, 0);
+            DockPanel.SetDock(tag, Dock.Right);
+            row.Children.Add(tag);
+        }
+
+        var title = Ui.Text(calendar.Name, 12);
+        title.TextWrapping = TextWrapping.NoWrap;
+        title.TextTrimming = TextTrimming.CharacterEllipsis;
+        row.Children.Add(title);
+        return row;
     }
 
     private static string HostOf(string url) =>
@@ -477,5 +523,90 @@ internal sealed class CalendarsEditor : Border
             state.HoldUntilHovered = true;
         }
         if (picked == true) Add(dialog.FileName);
+    }
+}
+
+/// A Microsoft or Google account: who is signed in, what went wrong, and Sign in / Sign out.
+/// Used in the Calendars card (compact) and in Settings → Integrations, and keeps itself up to date.
+internal sealed class AccountRow : ContentControl
+{
+    private readonly CalendarService _service;
+    private readonly CalendarAccount _account;
+    private readonly bool _compact;
+
+    public AccountRow(CalendarService service, CalendarAccount account, bool compact)
+    {
+        _service = service;
+        _account = account;
+        _compact = compact;
+        Render();
+        Loaded += (_, _) =>
+        {
+            _service.Changed += Render;
+            Render();
+        };
+        Unloaded += (_, _) => _service.Changed -= Render;
+    }
+
+    private void Render()
+    {
+        var kind = _account.Kind;
+        var email = _service.Email(kind);
+        var signingIn = _service.IsSigningIn(kind);
+        var error = _service.AccountError(kind) ?? _service.AccountWarning(kind);
+
+        var row = new DockPanel();
+        var icon = Ui.Glyph("\uE77B", 12, ThemeResources.SecondaryText);
+        icon.Width = 12;
+        icon.Margin = new Thickness(0, 0, 8, 0);
+        DockPanel.SetDock(icon, Dock.Left);
+        row.Children.Add(icon);
+
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        if (signingIn) buttons.Children.Add(ActionButton("Cancel", "\uE711", () => _service.CancelSignIn(kind)));
+        else if (email == null && _compact && _account.SetupProblem != null)
+            buttons.Children.Add(ActionButton("Set up", "\uE713", () => SettingsView.Open(SettingsView.Section.Integrations), prominent: true));
+        else if (email == null || _service.NeedsSignIn(kind))
+            buttons.Children.Add(ActionButton("Sign in", "\uE77B", () => _service.SignIn(kind), prominent: true));
+        if (email != null && !signingIn) buttons.Children.Add(ActionButton("Sign out", "\uE711", () => _service.SignOut(kind)));
+        DockPanel.SetDock(buttons, Dock.Right);
+        row.Children.Add(buttons);
+
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        var title = Ui.Text(email == null ? _account.Title : $"{_account.Title} · {email}", 12, weight: FontWeights.SemiBold);
+        var detail = Ui.Text(signingIn ? "Finish signing in in your browser…"
+            : error ?? (email != null ? CalendarsSummary(kind) : _account.SetupProblem ?? "Not signed in"), 10, ThemeResources.SecondaryText);
+        if (error != null && !signingIn) detail.Foreground = Color.FromRgb(0xFF, 0x45, 0x3A).Brush();
+        title.TextWrapping = TextWrapping.NoWrap;
+        title.TextTrimming = TextTrimming.CharacterEllipsis;
+        // Errors say what to do, so they may take a second line.
+        if (_compact && error == null)
+        {
+            detail.TextWrapping = TextWrapping.NoWrap;
+            detail.TextTrimming = TextTrimming.CharacterEllipsis;
+        }
+        text.Children.Add(title);
+        text.Children.Add(detail);
+        row.Children.Add(text);
+        Content = row;
+    }
+
+    private string CalendarsSummary(AccountKind kind)
+    {
+        var all = _service.CalendarsOf(kind);
+        var calendars = all.Count(c => !c.IsTaskList);
+        var lists = all.Count - calendars;
+        if (all.Count == 0) return _service.IsLoading ? "Loading…" : "Signed in";
+        return $"{calendars} {(calendars == 1 ? "calendar" : "calendars")}, {lists} task {(lists == 1 ? "list" : "lists")}";
+    }
+
+    private Button ActionButton(string title, string glyph, Action action, bool prominent = false)
+    {
+        Button button;
+        if (_compact) button = Ui.Bare(Ui.Text(title, 11, prominent ? ThemeResources.Accent : ThemeResources.SecondaryText, FontWeights.SemiBold), action);
+        else button = Ui.Pill(title, glyph, action, prominent);
+        button.VerticalAlignment = VerticalAlignment.Center;
+        button.Margin = new Thickness(8, 0, 0, 0);
+        return button;
     }
 }

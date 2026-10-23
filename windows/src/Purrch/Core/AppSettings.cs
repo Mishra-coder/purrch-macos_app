@@ -30,6 +30,7 @@ public sealed class AppSettings : INotifyPropertyChanged
         public string RevenueCurrency { get; set; } = "usd";
         public string PlausibleSite { get; set; } = "";
         public string PlausibleHost { get; set; } = "https://plausible.io";
+        public string MicrosoftClientId { get; set; } = "";
     }
 
     private static readonly JsonSerializerOptions Json = new()
@@ -163,6 +164,13 @@ public sealed class AppSettings : INotifyPropertyChanged
     {
         get => _data.PlausibleHost;
         set { if (_data.PlausibleHost != value) { _data.PlausibleHost = value; Changed(); } }
+    }
+
+    /// Application (client) ID of the user's own Azure app registration, for signing in to Microsoft in Calendar.
+    public string MicrosoftClientId
+    {
+        get => _data.MicrosoftClientId;
+        set { if (_data.MicrosoftClientId != value) { _data.MicrosoftClientId = value; Changed(); } }
     }
 
     /// Lives in the registry, not settings.json, so Task Manager's Startup tab and this toggle agree.

@@ -8,8 +8,9 @@ namespace Purrch.Features.Calendar;
 public sealed record AgendaEvent(string Id, string Title, DateTime Start, DateTime End, bool IsAllDay,
                                  string? Location, Guid SourceId);
 
-/// An open to-do: a VTODO from a calendar feed, or one added in Purrch (no source).
-public sealed record ReminderItem(string Id, string Title, DateTime? Due, Guid? SourceId);
+/// An open to-do: a VTODO from a calendar feed, a To Do or Google task, or one added in Purrch (no source).
+/// DueIsDate: the due date has no time (To Do and Google Tasks keep only the day).
+public sealed record ReminderItem(string Id, string Title, DateTime? Due, Guid? SourceId, bool DueIsDate = false);
 
 /// What one .ics file holds for the coming days.
 public sealed record FeedContent(string? Name, List<AgendaEvent> Events, List<ReminderItem> Todos);
