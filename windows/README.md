@@ -15,8 +15,9 @@ The project builds on macOS, but the app only runs on Windows 10 (1809 or later)
 | 5 | Now Playing (Windows media session) | Done; not yet run on Windows |
 | 6 | System (CPU, memory, disk, network, battery) | Done; not yet run on Windows |
 | 7 | Assistant and Translate (Claude, OpenAI or Gemini, your own key) | Done; not yet run on Windows |
+| 8 | Emoji, Units, Links, Shelf, Captures, File Converter, Downloads, Message, Ambience, Calendar, Weather | Done; not yet run on Windows |
 
-All 24 modules from the Mac app are in the tab bar. The ones not built yet show a "Coming soon" card.
+All 24 modules from the Mac app are in the tab bar. Home, Screen Time, Claude Code, Revenue and Analytics are not built yet and show a "Coming soon" card.
 
 ## Build on a Mac
 
