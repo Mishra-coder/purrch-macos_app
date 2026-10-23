@@ -178,6 +178,7 @@ public partial class ExpandedView : UserControl
             ModuleId.Calendar => new Features.Calendar.CalendarModule(),
             ModuleId.Weather => new Features.Weather.WeatherModule(),
             ModuleId.Revenue => new Features.Revenue.RevenueModule(),
+            ModuleId.Analytics => new Features.Analytics.AnalyticsModule(),
             ModuleId.NowPlaying => new Features.Media.NowPlayingModule(),
             ModuleId.Message => new Features.Media.MessageModule(),
             ModuleId.Ambience => new Features.Media.AmbienceModule(),

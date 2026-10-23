@@ -17,9 +17,9 @@ The project builds on macOS, but the app only runs on Windows 10 (1809 or later)
 | 7 | Assistant and Translate (Claude, OpenAI or Gemini, your own key) | Done; not yet run on Windows |
 | 8 | Emoji, Units, Links, Shelf, Captures, File Converter, Downloads, Message, Ambience, Calendar, Weather | Done; not yet run on Windows |
 | 9 | Screen Time and Claude Code | Done; not yet run on Windows |
-| 10 | Revenue (Stripe), with your own key | Done; not yet run on Windows |
+| 10 | Revenue (Stripe) and Analytics (Plausible), with your own key | Done; not yet run on Windows |
 
-All 24 modules from the Mac app are in the tab bar. Home and Analytics are not built yet and show a "Coming soon" card.
+All 24 modules from the Mac app are in the tab bar. Home is not built yet and shows a "Coming soon" card.
 
 ## Build on a Mac
 
@@ -255,6 +255,16 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] A new test payment appears within about a minute while the tab is open; the refresh arrow in "Sales" fetches at once and spins meanwhile.
 - [ ] Turn off Wi-Fi and reopen Purrch: the last figures stay on screen, with a warning sign next to the time; its tooltip says "Couldn't reach Stripe… Showing the last copy." With no copy yet, the Sales card says "Couldn't load Stripe".
 
+**Analytics**
+
+- [ ] With no Plausible key or no site, Analytics says "Connect Plausible" and which one is missing; **Open Settings** opens Settings on Integrations.
+- [ ] Settings → Integrations → Analytics (Plausible): paste a Stats API key (Plausible → Account settings → API keys), and type the site domain exactly as it is in Plausible (e.g. `example.com`). The key shows up in Credential Manager as `Purrch:plausible`; clearing it removes it.
+- [ ] The top row shows LIVE with a pulsing green dot and the visitors of the last few minutes in large accent digits, then today's Visitors, Pageviews, Bounce and Visit (average length like "1:24"). Large numbers show as "12.3K".
+- [ ] "Today by hour" has a bar per hour from 00 to 23, the current hour brighter, with light grid lines and counts on the left. "Top pages" and "Top sources" list five rows each with a shaded bar for their share; visits with no referrer show as "Direct / none".
+- [ ] Open the site in another browser: LIVE goes up within about 30 seconds while the tab is open.
+- [ ] A self-hosted Plausible: putting its address in Host (with or without `https://`) loads its stats; a wrong key or a site the key can't see shows Plausible's own message followed by "Check Settings → Integrations.", and a host with no Plausible says "No Plausible Stats API at this host". **Retry** and **Open Settings** are offered.
+- [ ] Turn off Wi-Fi and reopen Purrch: the last stats stay on screen, with a warning sign before the time in "Today by hour" whose tooltip says "Couldn't reach plausible.io…".
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -285,8 +295,9 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Screen Time: seconds per app per day for the last 7 days, and app names and exe paths | `%APPDATA%\Purrch\screentime.json` |
 | Claude Code (read from, nothing saved) | `%USERPROFILE%\.claude\projects` |
 | Last Stripe figures (the currency is in `settings.json`, the key in Credential Manager) | `%APPDATA%\Purrch\revenue.json` |
+| Last Plausible stats (site and host are in `settings.json`, the key in Credential Manager) | `%APPDATA%\Purrch\analytics.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
-| API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` (`anthropic`, `openai`, `gemini`, `stripe`) |
+| API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` (`anthropic`, `openai`, `gemini`, `stripe`, `plausible`) |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |
 
 To reset Purrch completely, quit it from the tray, delete `%APPDATA%\Purrch`, and turn off **Purrch** in Task Manager → Startup apps (or delete the Run value).
@@ -329,3 +340,4 @@ How it maps to the Mac app:
 - Screen Time counts the app in front, so a window you are only reading or watching counts until the 2-minute idle limit, as on the Mac. Apps are grouped by exe name, so two different `python.exe` show as one.
 - Claude Code reads only `%USERPROFILE%\.claude\projects`, as the Mac app reads `~/.claude/projects`; a `CLAUDE_CONFIG_DIR` set elsewhere isn't followed. A transcript line still being written is counted on the next read, a minute later.
 - Revenue counts charges in the one currency set in Settings, and reads at most 500 charges from the last seven days, as the Mac app does.
+- Analytics uses Plausible's Stats API v1, the same as the Mac app. "Live" is Plausible's realtime count of visitors in the last 5 minutes.

@@ -28,6 +28,8 @@ public sealed class AppSettings : INotifyPropertyChanged
         public string WeatherCity { get; set; } = "";
         public bool UseFahrenheit { get; set; }
         public string RevenueCurrency { get; set; } = "usd";
+        public string PlausibleSite { get; set; } = "";
+        public string PlausibleHost { get; set; } = "https://plausible.io";
     }
 
     private static readonly JsonSerializerOptions Json = new()
@@ -130,6 +132,20 @@ public sealed class AppSettings : INotifyPropertyChanged
     {
         get => _data.RevenueCurrency;
         set { if (_data.RevenueCurrency != value) { _data.RevenueCurrency = value; Changed(); } }
+    }
+
+    /// Site domain as it is registered in Plausible ("example.com").
+    public string PlausibleSite
+    {
+        get => _data.PlausibleSite;
+        set { if (_data.PlausibleSite != value) { _data.PlausibleSite = value; Changed(); } }
+    }
+
+    /// Plausible server, for self-hosted installs; plausible.io by default.
+    public string PlausibleHost
+    {
+        get => _data.PlausibleHost;
+        set { if (_data.PlausibleHost != value) { _data.PlausibleHost = value; Changed(); } }
     }
 
     /// Lives in the registry, not settings.json, so Task Manager's Startup tab and this toggle agree.

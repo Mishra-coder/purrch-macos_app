@@ -205,6 +205,10 @@ public sealed class SettingsView : Grid
         Add(Secret("Restricted read-only key (rk_...)", Features.Revenue.RevenueService.SecretName));
         Add(Plain("Currency (usd, eur, inr...)", _settings.RevenueCurrency, v => _settings.RevenueCurrency = v));
 
+        Add(Heading("Analytics (Plausible)"));
+        Add(Secret("Plausible API key", Features.Analytics.AnalyticsService.SecretName));
+        Add(Plain("Site domain (example.com)", _settings.PlausibleSite, v => _settings.PlausibleSite = v));
+        Add(Plain("Host (for self-hosted Plausible)", _settings.PlausibleHost, v => _settings.PlausibleHost = v));
     }
 
     /// A plain text field. Commits a moment after typing stops, so each key doesn't start a new lookup.
