@@ -28,9 +28,12 @@ public sealed class DownloadsModule : Grid
     private readonly HashSet<string> _selection = new(StringComparer.OrdinalIgnoreCase);
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(30) };
     private bool _selecting;
+    // What the rows showed last time, so check circles and actions can animate when it changes.
+    private bool _shownSelecting;
+    private readonly HashSet<string> _shownSelection = new(StringComparer.OrdinalIgnoreCase);
     private string _listKey = "";
     private string _barKey = "";
-    private bool _menuOpen, _rebuildAfterMenu;
+    private bool _menuOpen, _rebuildAfterMenu, _rowsLeaving;
 
     public DownloadsModule()
     {
@@ -110,7 +113,8 @@ public sealed class DownloadsModule : Grid
         if (key != _listKey)
         {
             if (_menuOpen) _rebuildAfterMenu = true;
-            else
+            // Rows sliding out finish first; the rebuild follows them.
+            else if (!_rowsLeaving)
             {
                 _listKey = key;
                 BuildList(justDone, selectable);
@@ -161,22 +165,54 @@ public sealed class DownloadsModule : Grid
                 Height = 160,
                 Children = { Ui.EmptyState("\uE896", "No downloads yet", "Files you download will appear here with live progress.") },
             });
-            return;
         }
-        foreach (var item in _service.Recent)
-            _finished.Children.Add(Row(item, _service.Completed.Any(c => Same(c.Path, item.Path))));
+        else
+        {
+            foreach (var item in _service.Recent)
+                _finished.Children.Add(Row(item, _service.Completed.Any(c => Same(c.Path, item.Path))));
+        }
+        _shownSelecting = _selecting;
+        _shownSelection.Clear();
+        _shownSelection.UnionWith(_selection);
     }
 
     private DownloadRow Row(DownloadItem item, bool highlight)
     {
-        var row = new DownloadRow(item, highlight, _selecting, _selection.Contains(item.Path), () =>
+        var selected = _selection.Contains(item.Path);
+        // Entering select mode grows the circles in from nothing; ticking one pops it.
+        double? checkFrom = !_selecting ? null
+            : !_shownSelecting ? 0
+            : _shownSelection.Contains(item.Path) != selected ? 0.6
+            : null;
+        var row = new DownloadRow(item, highlight, _selecting, selected, () =>
         {
             if (!_selection.Remove(item.Path)) _selection.Add(item.Path);
             Refresh();
-        })
+        }, TrashAnimated, checkFrom, fadeInActions: !_selecting && _shownSelecting)
         { Margin = new Thickness(0, 0, 0, 6) };
         _rows.Add(row);
         return row;
+    }
+
+    /// The rows shrink and fade (Motion.Pop) and the list closes up; then the files go to the Recycle Bin
+    /// with the Undo offer, and <paramref name="then"/> runs.
+    private void TrashAnimated(IReadOnlyCollection<string> paths, Action? then = null)
+    {
+        var leaving = _rows.Where(r => paths.Contains(r.Path, StringComparer.OrdinalIgnoreCase) && r.IsVisible).ToList();
+        void Finish()
+        {
+            _rowsLeaving = false;
+            _service.Trash(paths);
+            then?.Invoke();
+            Refresh();
+        }
+        if (_rowsLeaving || leaving.Count == 0)
+        {
+            Finish();
+            return;
+        }
+        _rowsLeaving = true;
+        for (var i = 0; i < leaving.Count; i++) leaving[i].PopOut(i == leaving.Count - 1 ? Finish : null);
     }
 
     private UIElement Section(string title, bool canSelect = false)
@@ -251,13 +287,11 @@ public sealed class DownloadsModule : Grid
                     new TextBlock { Text = "Delete", FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Margin = new Thickness(6, 0, 0, 0) },
                 },
             },
-        }, () =>
+        }, () => TrashAnimated(_selection.ToList(), () =>
         {
-            _service.Trash(_selection.ToList());
             _selection.Clear();
             _selecting = false;
-            Refresh();
-        });
+        }));
         delete.IsEnabled = _selection.Count > 0;
         DockPanel.SetDock(delete, Dock.Right);
         row.Children.Add(delete);
@@ -319,10 +353,13 @@ public sealed class DownloadsModule : Grid
                     $"Purrch couldn't open {_service.Folder}.\nCheck that the folder exists and opens in File Explorer."),
             },
         });
-        var retry = Ui.Pill("Try again", "\uE72C", _service.Rescan, prominent: true);
-        retry.HorizontalAlignment = HorizontalAlignment.Center;
-        retry.Margin = new Thickness(0, 4, 0, 12);
-        stack.Children.Add(retry);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 12) };
+        // File Explorer says what is wrong (a missing drive, no permission) and can fix the folder's location.
+        buttons.Children.Add(Ui.Pill("Open in File Explorer", "\uE838", () => FileMeta.OpenFolder(_service.Folder), prominent: true));
+        var retry = Ui.Pill("Try again", "\uE72C", _service.Rescan);
+        retry.Margin = new Thickness(8, 0, 0, 0);
+        buttons.Children.Add(retry);
+        stack.Children.Add(buttons);
         return stack;
     }
 
@@ -332,7 +369,7 @@ public sealed class DownloadsModule : Grid
 /// A download in flight: name, percentage, a glowing bar, and bytes, speed and time left.
 internal sealed class ActiveRow : ListRow
 {
-    private readonly TextBlock _name = Ui.Text("", 13, weight: FontWeights.SemiBold);
+    private readonly MiddleTrimmedText _name = new("", 13);
     private readonly TextBlock _percent = Ui.Text("", 12, ThemeResources.Accent, FontWeights.SemiBold).Tabular();
     private readonly TextBlock _detail = Ui.Text("", 11, ThemeResources.SecondaryText).Tabular();
     private readonly Grid _bar = new() { Height = 5, Margin = new Thickness(0, 5, 0, 5) };
@@ -358,8 +395,6 @@ internal sealed class ActiveRow : ListRow
         DockPanel.SetDock(_percent, Dock.Right);
         _percent.Margin = new Thickness(8, 0, 0, 0);
         top.Children.Add(_percent);
-        _name.TextWrapping = TextWrapping.NoWrap;
-        _name.TextTrimming = TextTrimming.CharacterEllipsis;
         top.Children.Add(_name);
         text.Children.Add(top);
 
@@ -382,7 +417,7 @@ internal sealed class ActiveRow : ListRow
 
     public void Update(ActiveDownload item)
     {
-        _name.Text = item.Name;
+        _name.FullText = item.Name;
         ToolTip = item.Name;
         _percent.Text = item.Total != null ? $"{(int)(item.Progress * 100)}%" : "\u2026";
         _detail.Text = Detail(item);
@@ -417,7 +452,11 @@ internal sealed class DownloadRow : ListRow
     private readonly DownloadItem _item;
     private readonly TextBlock _meta;
 
-    public DownloadRow(DownloadItem item, bool highlight, bool selecting, bool selected, Action toggle) : base(new DockPanel())
+    /// <paramref name="checkFrom"/> is the scale the check circle grows from (0 entering select mode, 0.6 when
+    /// ticked), or null to show it still; <paramref name="fadeInActions"/> fades the buttons back in after it.
+    public DownloadRow(DownloadItem item, bool highlight, bool selecting, bool selected, Action toggle,
+                       Action<IReadOnlyCollection<string>, Action?> trash, double? checkFrom = null, bool fadeInActions = false)
+        : base(new DockPanel())
     {
         _item = item;
         var layout = (DockPanel)Child;
@@ -431,6 +470,17 @@ internal sealed class DownloadRow : ListRow
             check.Margin = new Thickness(0, 0, 10, 0);
             DockPanel.SetDock(check, Dock.Left);
             layout.Children.Add(check);
+            if (checkFrom is { } from)
+            {
+                // The Mac check's scale and opacity transition, with Motion.Pop's spring.
+                var grow = new ScaleTransform(from, from);
+                check.RenderTransformOrigin = new Point(0.5, 0.5);
+                check.RenderTransform = grow;
+                check.Opacity = from;
+                grow.Animate(ScaleTransform.ScaleXProperty, 1, Motion.Pop);
+                grow.Animate(ScaleTransform.ScaleYProperty, 1, Motion.Pop);
+                check.Animate(OpacityProperty, 1, Motion.ExpoOut(0.3));
+            }
             if (selected)
             {
                 BorderThickness = new Thickness(1.5);
@@ -449,16 +499,18 @@ internal sealed class DownloadRow : ListRow
             if (isImage) actions.Children.Add(CopyButton());
             actions.Children.Add(Action("\uE721", "Show in File Explorer", () => FileMeta.Reveal(item.Path)));
             actions.Children.Add(Action("\uE8A7", "Open", () => FileMeta.Open(item.Path)));
-            actions.Children.Add(Action("\uE74D", "Move to Recycle Bin", () => DownloadsService.Shared.Trash(new[] { item.Path })));
+            actions.Children.Add(Action("\uE74D", "Move to Recycle Bin", () => trash(new[] { item.Path }, null)));
             DockPanel.SetDock(actions, Dock.Right);
             layout.Children.Add(actions);
+            if (fadeInActions)
+            {
+                actions.Opacity = 0;
+                actions.Animate(OpacityProperty, 1, Motion.ExpoOut(0.35));
+            }
         }
 
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        var name = Ui.Text(item.Name, 13, weight: FontWeights.SemiBold);
-        name.TextWrapping = TextWrapping.NoWrap;
-        name.TextTrimming = TextTrimming.CharacterEllipsis;
-        text.Children.Add(name);
+        text.Children.Add(new MiddleTrimmedText(item.Name, 13));
         var tags = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 3, 0, 0) };
         var label = FileMeta.Label(item.Path);
         tags.Children.Add(FileUi.Tag(label, FileMeta.ColorFor(label)));
@@ -478,8 +530,10 @@ internal sealed class DownloadRow : ListRow
 
         if (selecting) MouseLeftButtonUp += (_, _) => toggle();
         FileUi.DragOut(this, () => FileMeta.DragData(new[] { item.Path }));
-        ContextMenu = Menu(item);
+        ContextMenu = Menu(item, trash);
     }
+
+    public string Path => _item.Path;
 
     public void UpdateMeta()
     {
@@ -534,7 +588,7 @@ internal sealed class DownloadRow : ListRow
         return grid;
     }
 
-    private static ContextMenu Menu(DownloadItem item)
+    private static ContextMenu Menu(DownloadItem item, Action<IReadOnlyCollection<string>, Action?> trash)
     {
         var menu = new ContextMenu();
         void Add(string header, Action action)
@@ -547,7 +601,7 @@ internal sealed class DownloadRow : ListRow
         Add("Show in File Explorer", () => FileMeta.Reveal(item.Path));
         Add("Copy", () => FileMeta.CopyFiles(new[] { item.Path }));
         menu.Items.Add(new Separator());
-        Add("Move to Recycle Bin", () => DownloadsService.Shared.Trash(new[] { item.Path }));
+        Add("Move to Recycle Bin", () => trash(new[] { item.Path }, null));
         return menu;
     }
 }

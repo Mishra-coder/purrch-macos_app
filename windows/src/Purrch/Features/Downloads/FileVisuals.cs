@@ -81,26 +81,47 @@ internal static class FileVisuals
         }
     }
 
-    /// An image thumbnail that fills a rounded square, or the file's icon until (or unless) one loads.
+    /// An image thumbnail that fills a rounded square, or the icon File Explorer shows (a real folder icon for
+    /// folders, the app's own icon for an .exe), made by the shell at twice the size so it stays crisp when scaled.
     public static Border Thumbnail(string path, double size, double radius)
     {
+        var placeholder = Directory.Exists(path)
+            ? Ui.Glyph("\uE8B7", size * 0.7, ThemeResources.Accent)
+            : Ui.Glyph("\uE7C3", size * 0.7, ThemeResources.SecondaryText);
+        placeholder.HorizontalAlignment = HorizontalAlignment.Center;
         var box = new Border
         {
             Width = size,
             Height = size,
             CornerRadius = new CornerRadius(radius),
-            Child = Icon(path, size),
+            Child = placeholder,
         };
-        if (ImageConverter.IsImage(path)) LoadInto(box, path, (int)Math.Ceiling(size * 2));
+        var pixels = (int)Math.Ceiling(size * 2);
+        if (ImageConverter.IsImage(path)) LoadInto(box, path, pixels);
+        else ShellIconInto(box, path, size, pixels);
         return box;
     }
 
     private static async void LoadInto(Border box, string path, int pixels)
     {
-        if (await ThumbnailAsync(path, pixels) is not { } image) return;
+        if (await ThumbnailAsync(path, pixels) is not { } image)
+        {
+            // A picture Windows can't decode (yet) still gets its icon.
+            ShellIconInto(box, path, box.Width, pixels);
+            return;
+        }
         box.Child = null;
         box.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
     }
+
+    private static void ShellIconInto(Border box, string path, double size, int pixels) =>
+        Core.Thumbnails.Request(path, pixels, source =>
+        {
+            if (source == null) return;
+            var image = new Image { Source = source, Width = size, Height = size, Stretch = Stretch.Uniform };
+            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+            box.Child = image;
+        });
 }
 
 /// Row container used by the file lists: a rounded surface that lightens under the pointer.
@@ -116,6 +137,76 @@ internal class ListRow : Border
         SetResourceReference(BorderBrushProperty, ThemeResources.Hairline);
         MouseEnter += (_, _) => SetResourceReference(BackgroundProperty, ThemeResources.Fill);
         MouseLeave += (_, _) => SetResourceReference(BackgroundProperty, ThemeResources.Surface);
+    }
+
+    /// A new row springs in from slightly smaller while fading in.
+    public void PopIn()
+    {
+        var scale = new ScaleTransform(0.9, 0.9);
+        RenderTransformOrigin = new Point(0.5, 0.5);
+        RenderTransform = scale;
+        Opacity = 0;
+        scale.Animate(ScaleTransform.ScaleXProperty, 1, Motion.Pop);
+        scale.Animate(ScaleTransform.ScaleYProperty, 1, Motion.Pop);
+        this.Animate(OpacityProperty, 1, Motion.ExpoOut(0.3));
+    }
+
+    /// Shrinks and fades with Motion.Pop, then closes up so the rows below slide into its place.
+    public void PopOut(Action? completed)
+    {
+        IsHitTestVisible = false;
+        ClipToBounds = true;
+        var scale = new ScaleTransform(1, 1);
+        RenderTransformOrigin = new Point(0.5, 0.5);
+        RenderTransform = scale;
+        scale.Animate(ScaleTransform.ScaleXProperty, 0.9, Motion.Pop);
+        scale.Animate(ScaleTransform.ScaleYProperty, 0.9, Motion.Pop);
+        this.Animate(OpacityProperty, 0, Motion.ExpoOut(0.25));
+        var close = Motion.ExpoOut(0.3);
+        // Height is automatic (NaN) until now, and an animation needs a number to start from.
+        Height = ActualHeight;
+        this.Animate(HeightProperty, 0, close, delay: 0.12, completed: completed);
+        BeginAnimation(MarginProperty, new System.Windows.Media.Animation.ThicknessAnimation(new Thickness(0), TimeSpan.FromSeconds(close.Seconds))
+        {
+            EasingFunction = close.Easing,
+            BeginTime = TimeSpan.FromSeconds(0.12),
+        });
+    }
+}
+
+/// A one-line semibold name that loses its middle rather than its end when space runs out
+/// ("Screenshot 20…12.png"), so the extension stays visible, like the Mac app's .truncationMode(.middle).
+internal sealed class MiddleTrimmedText : Decorator
+{
+    private readonly TextBlock _text;
+    private string _fullText;
+
+    public MiddleTrimmedText(string text, double size)
+    {
+        _fullText = text;
+        _text = Ui.Text(text, size, weight: FontWeights.SemiBold);
+        _text.TextWrapping = TextWrapping.NoWrap;
+        Child = _text;
+        VerticalAlignment = VerticalAlignment.Center;
+    }
+
+    public string FullText
+    {
+        get => _fullText;
+        set
+        {
+            if (_fullText == value) return;
+            _fullText = value;
+            InvalidateMeasure();
+        }
+    }
+
+    /// Fits the name to the width on offer. The same width gives the same text, so layout settles in one pass.
+    protected override Size MeasureOverride(Size constraint)
+    {
+        var fitted = double.IsInfinity(constraint.Width) ? _fullText : Ui.MiddleTrim(_fullText, _text.FontSize, constraint.Width, _text.FontWeight, _text.FontFamily);
+        if (_text.Text != fitted) _text.Text = fitted;
+        return base.MeasureOverride(constraint);
     }
 }
 

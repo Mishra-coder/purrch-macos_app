@@ -255,10 +255,13 @@ None of this has run on a real Windows machine yet. Please go through the list a
 
 - [ ] The list shows the 20 newest files in your Downloads folder, also when it has been moved to another drive (File Explorer, Downloads, Properties, Location).
 - [ ] Download a big file in Chrome, Edge and Firefox. A "Downloading" row appears within a second with size so far, speed and a moving bar; the closed pill shows a download icon on the left and a filling ring on the right. Two at once show "2 downloads" in the pill.
+- [ ] Chrome, Edge, Brave and Vivaldi (any profile): within a few seconds the row shows the real file name (not "Unconfirmed 123456"), a real percentage, "120 MB of 480 MB", and time left, and the pill's ring matches the browser's own progress. Firefox shows "…" and an estimated bar, as before.
 - [ ] When it finishes, the ring fills for about three seconds, and the file appears under "Just finished" or with a green DONE tag in "Recent". Cancelling a download removes its row without a DONE tag.
 - [ ] Firefox: no empty duplicate of the file shows in "Recent" while it downloads.
-- [ ] Image rows show a thumbnail and a copy button (Ctrl+V then pastes the picture into Paint or a chat, or the file into a folder); other files show their File Explorer icon. Show in File Explorer, Open and the bin work. Right-click shows the same.
-- [ ] The bin, or **Select** then **Delete**, moves files to the Recycle Bin after a few seconds; **Undo** in that time keeps them. Quitting Purrch during those seconds still recycles them.
+- [ ] Image rows show a thumbnail and a copy button (Ctrl+V then pastes the picture into Paint or a chat, or the file into a folder); other files show their File Explorer icon and folders a real folder icon, sharp at 150% and 200% scaling. Long names lose their middle, so the extension stays visible. Show in File Explorer, Open and the bin work. Right-click shows the same.
+- [ ] The bin, or **Select** then **Delete**, shrinks the rows away and the list closes up; the files go to the Recycle Bin after a few seconds, and **Undo** in that time keeps them. Quitting Purrch during those seconds still recycles them.
+- [ ] **Select** grows a check circle in on each row and the buttons give way; ticking a row pops its check; **Done** fades the buttons back.
+- [ ] If the Downloads folder can't be read (for example, its location points at a removed drive), the tab says "Can't read Downloads" with **Open in File Explorer** and **Try again**.
 - [ ] With a timer running, the pill shows the timer instead of the download; with music playing, the download wins.
 
 **Calendar**
@@ -350,7 +353,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Captures (read from; the Screenshot button's snip is saved to Pictures → Screenshots when Windows doesn't save it) | Pictures → Screenshots, Videos → Screen Recordings, Videos → Captures |
 | File Converter format, max size and quality | `%APPDATA%\Purrch\converter.json` |
 | Converted images | Next to the originals, as `name-converted.ext` |
-| Downloads | Nothing stored; it reads your Downloads folder. Deleted files go to the Recycle Bin |
+| Downloads | Nothing stored; it reads your Downloads folder, and while a Chromium download runs, a copy of the browser's `History` in `%TEMP%` that is deleted straight after. Deleted files go to the Recycle Bin |
 | Calendar links and files, reminders added in Purrch, feed to-dos ticked off | `%APPDATA%\Purrch\calendar.json`, last download of each link in `calendar-cache\` |
 | Last weather forecast (city and °F are in `settings.json`) | `%APPDATA%\Purrch\weather.json` |
 | Screen Time: seconds per app per day for the last 7 days, and app names and exe paths | `%APPDATA%\Purrch\screentime.json` |
@@ -394,7 +397,7 @@ How it maps to the Mac app:
 - The pill always sits on the primary screen.
 - Opening the panel from the tray, a second launch or the welcome screen gives it the keyboard straight away. Opening it by hovering doesn't, because on Windows that would take focus from the app you are in; click inside first to type. When the panel closes, keyboard focus goes back to the app you were in.
 - The closed pill shows a message first, then a running timer, then a download, then music.
-- Chrome, Edge and Firefox don't write the expected size of a download next to the file, so download progress is estimated (as it is for Chrome on the Mac) and the percentage shows as "…".
+- Firefox doesn't record the expected size of a download anywhere Purrch can read, so its progress is estimated and the percentage shows as "…". Chrome, Edge, Brave and Vivaldi show real progress from their history, which they update a few seconds after a download starts (the estimate covers those seconds). Other Chromium browsers (Opera, Arc, Chrome Beta) are estimated too.
 - The Shelf follows a renamed or moved file only on the same drive (as NTFS file IDs do); moved to another drive, it drops off the shelf.
 - Dragging files onto the closed pill opens the Shelf. To drop images on the File Converter, pin the panel first: pressing the mouse in File Explorer to start the drag closes an unpinned panel.
 - The exe is not code-signed, so SmartScreen warns on first run.

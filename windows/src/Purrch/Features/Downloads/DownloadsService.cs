@@ -14,8 +14,8 @@ public sealed record DownloadItem(string Path, long Size, DateTime Date)
 public sealed class ActiveDownload
 {
     public required string Path { get; init; }
-    /// Name of the finished file.
-    public required string Name { get; init; }
+    /// Name of the finished file. A Chromium browser's history replaces "Unconfirmed 123456" with the real one.
+    public required string Name { get; set; }
     public long Bytes { get; set; }
     public long? Total { get; set; }
     /// 0 to 1. Real when <see cref="Total"/> is known, estimated otherwise.
@@ -27,7 +27,8 @@ public sealed class ActiveDownload
 
 /// Watches the Downloads folder. Browsers write a download to a partial file (Chrome and Edge ".crdownload",
 /// Firefox ".part") and rename it when done; those partial files become live progress rows, and the pill
-/// shows a progress ring while any are present.
+/// shows a progress ring while any are present. For Chrome, Edge, Brave and Vivaldi the expected size comes
+/// from the browser's history, so their rows show a real percentage and time left.
 public sealed class DownloadsService
 {
     public static DownloadsService Shared { get; } = new();
@@ -49,6 +50,11 @@ public sealed class DownloadsService
     private FileSystemWatcher? _watcher;
     private DateTime _lastFullScan = DateTime.MinValue;
     private bool _started, _scanning, _rescan;
+    /// Chromium downloads in progress, from the browsers' history; read at most every 2.5 seconds, and only
+    /// while a ".crdownload" still has no known size.
+    private IReadOnlyList<ChromiumDownloads.Entry> _browserDownloads = Array.Empty<ChromiumDownloads.Entry>();
+    private DateTime _lastBrowserRead = DateTime.MinValue;
+    private bool _readingBrowsers, _browsersUnavailable;
 
     /// Anything on screen may have changed: the lists, progress, or the Recycle Bin bar.
     public event Action? Changed;
@@ -268,12 +274,17 @@ public sealed class DownloadsService
                 {
                     item.Speed = 0;
                 }
-                // Browsers don't record the expected size next to the file, so the total stays unknown:
-                // creep towards 95% as data keeps arriving.
+                // Firefox doesn't record the expected size anywhere Purrch can read, and a Chromium download
+                // reaches the history a few seconds late: creep towards 95% as data keeps arriving.
                 var step = bytes > 0 ? 0.04 : 0.01;
-                item.Progress = Math.Min(0.95, item.Progress + (0.95 - item.Progress) * step);
+                if (item.Total == null) item.Progress = Math.Min(0.95, item.Progress + (0.95 - item.Progress) * step);
             }
             item.Bytes = bytes;
+            if (BrowserEntry(entry.Path) is { } known)
+            {
+                if (known.Total > 0) item.Total = known.Total;
+                if (known.TargetPath.Length > 0) item.Name = Path.GetFileName(known.TargetPath);
+            }
             if (item.Total is { } total and > 0) item.Progress = Math.Min(1, (double)bytes / total);
         }
 
@@ -292,6 +303,8 @@ public sealed class DownloadsService
         }
 
         Active = _tracked.Values.OrderBy(a => a.Path, StringComparer.OrdinalIgnoreCase).ToList();
+        if (_tracked.Count == 0) _browserDownloads = Array.Empty<ChromiumDownloads.Entry>();
+        else ReadBrowsersIfNeeded();
 
         // Firefox keeps an empty placeholder under the final name while the ".part" fills up; hide it until done.
         var placeholders = new HashSet<string>(
@@ -312,6 +325,34 @@ public sealed class DownloadsService
         if (finished.Count > 0) Complete(finished);
         PublishLiveActivity();
         Changed?.Invoke();
+    }
+
+    // MARK: - Chromium history
+
+    /// The history row for a ".crdownload": by the file being written, or by the name it will get.
+    private ChromiumDownloads.Entry? BrowserEntry(string partial) =>
+        _browserDownloads.FirstOrDefault(d => SamePath(d.CurrentPath, partial)
+            || (d.TargetPath.Length > 0 && SamePath(d.TargetPath + ".crdownload", partial)));
+
+    /// Looks the sizes up in the browsers' history, off the UI thread, while a ".crdownload" has none yet.
+    /// The next scan (a second later while downloading) uses what it found.
+    private async void ReadBrowsersIfNeeded()
+    {
+        if (_readingBrowsers || _browsersUnavailable || (DateTime.Now - _lastBrowserRead).TotalSeconds < 2.5) return;
+        if (!_tracked.Values.Any(a => a.Total == null && a.Path.EndsWith(".crdownload", StringComparison.OrdinalIgnoreCase))) return;
+        _readingBrowsers = true;
+        try
+        {
+            _browserDownloads = await Task.Run(() => ChromiumDownloads.InProgress());
+        }
+        // SQLite's native library missing or blocked: estimates it is, as before.
+        catch (Exception e) when (e is TypeInitializationException or DllNotFoundException or BadImageFormatException or EntryPointNotFoundException)
+        {
+            Log.Write($"Browser history unavailable: {e.Message}");
+            _browsersUnavailable = true;
+        }
+        _lastBrowserRead = DateTime.Now;
+        _readingBrowsers = false;
     }
 
     private void Complete(List<DownloadItem> items)
