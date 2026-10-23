@@ -37,6 +37,9 @@ public sealed class CapturesModule : Grid
     // Tiles are kept per file version, so a refresh doesn't redraw every thumbnail.
     private readonly Dictionary<CaptureFile, CaptureTile> _tiles = new();
     private readonly HashSet<string> _selection = new(StringComparer.OrdinalIgnoreCase);
+    // Paths in the grid after the last build, so new ones pop in and gone ones shrink away.
+    private readonly HashSet<string> _onGrid = new(StringComparer.OrdinalIgnoreCase);
+    private bool _leaving;
     private CaptureFilter _filter = CaptureFilter.All;
     private bool _selecting;
     private CaptureFile? _previewing;
@@ -76,6 +79,38 @@ public sealed class CapturesModule : Grid
         _selection.IntersectWith(visible.Select(f => f.Path));
         if (visible.Count == 0 && _selecting) _selecting = false;
         RefreshToolbar(visible);
+        RebuildGrid(visible);
+
+        if (_previewing is { } shown && !visible.Contains(shown))
+            _previewing = visible.FirstOrDefault(f => f.Path == shown.Path);
+        RefreshPreview();
+        RefreshBottomBar();
+    }
+
+    /// Tiles that leave (deleted, or filtered away) shrink and fade first; then the grid is laid out again
+    /// and new tiles pop in, like the Mac grid's scale and opacity transition under Motion.pop.
+    private void RebuildGrid(List<CaptureFile> visible)
+    {
+        // A change while tiles are leaving is picked up by the rebuild that follows them.
+        if (_leaving) return;
+        var paths = new HashSet<string>(visible.Select(f => f.Path), StringComparer.OrdinalIgnoreCase);
+        if (_body.Content == _scroll)
+        {
+            var going = _grid.Children.OfType<CaptureTile>().Where(t => !paths.Contains(t.File.Path) && OnScreen(t)).ToList();
+            if (going.Count > 0)
+            {
+                _leaving = true;
+                // If one comes straight back (the filter switched back meanwhile), it pops in again.
+                _onGrid.ExceptWith(going.Select(t => t.File.Path));
+                for (var i = 0; i < going.Count; i++)
+                    going[i].PopOut(i < going.Count - 1 ? null : () =>
+                    {
+                        _leaving = false;
+                        RebuildGrid(Visible());
+                    });
+                return;
+            }
+        }
 
         // Drop tiles for files that are gone or have changed.
         foreach (var stale in _tiles.Keys.Where(k => !_model.Files.Contains(k)).ToList())
@@ -91,16 +126,30 @@ public sealed class CapturesModule : Grid
         else
         {
             _grid.Children.Clear();
-            foreach (var file in visible) _grid.Children.Add(Tile(file));
+            for (var i = 0; i < visible.Count; i++)
+            {
+                var tile = Tile(visible[i]);
+                // Only the first screenfuls animate; hundreds of springs at once would stutter.
+                if (!_onGrid.Contains(visible[i].Path))
+                {
+                    if (i < 60) tile.PopIn();
+                    else tile.ShowStill();
+                }
+                _grid.Children.Add(tile);
+            }
             _body.Content = _scroll;
             LayoutTiles();
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, LoadVisibleThumbnails);
         }
+        _onGrid.Clear();
+        _onGrid.UnionWith(paths);
+    }
 
-        if (_previewing is { } shown && !visible.Contains(shown))
-            _previewing = visible.FirstOrDefault(f => f.Path == shown.Path);
-        RefreshPreview();
-        RefreshBottomBar();
+    private bool OnScreen(CaptureTile tile)
+    {
+        if (!_scroll.IsLoaded || !tile.IsDescendantOf(_scroll)) return false;
+        var top = tile.TransformToAncestor(_scroll).Transform(new Point()).Y;
+        return top < _scroll.ViewportHeight && top + tile.ActualHeight > 0;
     }
 
     private CaptureTile Tile(CaptureFile file)
@@ -243,7 +292,7 @@ public sealed class CapturesModule : Grid
         title.HorizontalAlignment = HorizontalAlignment.Center;
         title.Margin = new Thickness(0, 10, 0, 0);
         stack.Children.Add(title);
-        var hint = Ui.Text("Press Win+PrtScn or use the Screenshot button — new captures land here.", 12, ThemeResources.SecondaryText);
+        var hint = Ui.Text("Press Win+PrtScn or Win+Shift+S, or use the Screenshot button — new captures land here.", 12, ThemeResources.SecondaryText);
         hint.HorizontalAlignment = HorizontalAlignment.Center;
         hint.TextAlignment = TextAlignment.Center;
         hint.Margin = new Thickness(0, 10, 0, 0);
@@ -408,8 +457,12 @@ public sealed class CapturesModule : Grid
     private void Preview(CaptureFile? file)
     {
         var wasOpen = _previewing != null;
+        var before = _previewHost.Children.Count == 1 ? _previewHost.Children[0] as CapturePreview : null;
         _previewing = file;
         RefreshPreview();
+        if (wasOpen && before != null && _previewHost.Children.Count == 1
+            && _previewHost.Children[0] is CapturePreview after && after != before)
+            after.CrossfadeFrom(before);
         if (wasOpen || file == null || _previewHost.Children.Count == 0) return;
         var view = (FrameworkElement)_previewHost.Children[0];
         var scale = new ScaleTransform(0.96, 0.96);
@@ -556,6 +609,46 @@ internal sealed class CaptureTile : StackPanel
             if (_pressPoint != null) _onOpen();
             _pressPoint = null;
         };
+    }
+
+    public CaptureFile File => _file;
+
+    /// Grows in from 60% while fading in (the Mac tile's scale and opacity transition).
+    public void PopIn()
+    {
+        IsHitTestVisible = true;
+        var scale = new ScaleTransform(0.6, 0.6);
+        RenderTransformOrigin = new Point(0.5, 0.5);
+        RenderTransform = scale;
+        Opacity = 0;
+        scale.Animate(ScaleTransform.ScaleXProperty, 1, Motion.Pop);
+        scale.Animate(ScaleTransform.ScaleYProperty, 1, Motion.Pop);
+        this.Animate(OpacityProperty, 1, Motion.ExpoOut(0.3));
+    }
+
+    /// Full size and opaque at once, undoing an earlier <see cref="PopOut"/>.
+    public void ShowStill()
+    {
+        IsHitTestVisible = true;
+        RenderTransform = null;
+        this.Set(OpacityProperty, 1);
+    }
+
+    /// Shrinks to 60% and fades away, then calls back.
+    public void PopOut(Action? completed)
+    {
+        IsHitTestVisible = false;
+        var scale = new ScaleTransform(1, 1);
+        RenderTransformOrigin = new Point(0.5, 0.5);
+        RenderTransform = scale;
+        scale.Animate(ScaleTransform.ScaleXProperty, 0.6, Motion.Pop);
+        scale.Animate(ScaleTransform.ScaleYProperty, 0.6, Motion.Pop, completed: () =>
+        {
+            // The tile may come back (switching the filter back); it pops in again then.
+            IsHitTestVisible = true;
+            completed?.Invoke();
+        });
+        this.Animate(OpacityProperty, 0, Motion.ExpoOut(0.25));
     }
 
     public void SetWidth(double width)
@@ -705,6 +798,8 @@ internal sealed class CaptureTile : StackPanel
 internal sealed class CapturePreview : Grid
 {
     private readonly IReadOnlyList<CaptureFile> _files;
+    private readonly Grid _row;
+    private readonly FrameworkElement _stage;
 
     public CaptureFile File { get; }
     public int Count => _files.Count;
@@ -722,7 +817,7 @@ internal sealed class CapturePreview : Grid
         backdrop.MouseLeftButtonUp += (_, e) => { go(null); e.Handled = true; };
         Children.Add(backdrop);
 
-        var row = new Grid { Margin = new Thickness(12) };
+        var row = _row = new Grid { Margin = new Thickness(12) };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
@@ -732,7 +827,7 @@ internal sealed class CapturePreview : Grid
         previous.Margin = new Thickness(0, 0, 12, 0);
         row.Children.Add(previous);
 
-        var stage = Stage(file);
+        var stage = _stage = Stage(file);
         SetColumn(stage, 1);
         row.Children.Add(stage);
 
@@ -748,8 +843,21 @@ internal sealed class CapturePreview : Grid
         Children.Add(row);
     }
 
+    /// Previous / next: the old picture fades out under the new one as it fades in.
+    public void CrossfadeFrom(CapturePreview old)
+    {
+        var leaving = old._stage;
+        old._row.Children.Remove(leaving);
+        leaving.IsHitTestVisible = false;
+        _row.Children.Insert(_row.Children.IndexOf(_stage), leaving);
+        var curve = Motion.ExpoOut(0.3);
+        _stage.Opacity = 0;
+        _stage.Animate(OpacityProperty, 1, curve);
+        leaving.Animate(OpacityProperty, 0, curve, completed: () => _row.Children.Remove(leaving));
+    }
+
     /// The picture itself, loaded full size in the background; a video shows its thumbnail and a play button.
-    private static UIElement Stage(CaptureFile file)
+    private static FrameworkElement Stage(CaptureFile file)
     {
         var stage = new Grid { ClipToBounds = true, Background = Color.FromArgb(77, 0, 0, 0).Brush() };
         var image = new Image { Stretch = Stretch.Uniform };

@@ -231,11 +231,12 @@ None of this has run on a real Windows machine yet. Please go through the list a
 **Captures**
 
 - [ ] Screenshots from Win+PrtScn and the Snipping Tool (Pictures → Screenshots), and recordings from the Snipping Tool (Videos → Screen Recordings) or Game Bar (Videos → Captures) appear newest first. With Pictures in OneDrive this still works.
-- [ ] A new screenshot appears within a second or two while the panel is open. All / Screenshots / Recordings filter the grid and show counts.
-- [ ] **Screenshot** closes the panel and opens the screen snip. On Windows 11 the snip is saved and shows up; on Windows 10 the snip only goes to the clipboard.
-- [ ] Clicking a tile opens the preview: previous / next, Copy, Open, Explorer and Delete work, and clicking outside the picture closes it. A recording shows a play button that opens your video player.
+- [ ] A new screenshot appears within a second or two while the panel is open, growing in from smaller. All / Screenshots / Recordings filter the grid and show counts; switching shrinks away the tiles that go and pops in the ones that come.
+- [ ] **Screenshot** closes the panel and opens the screen snip. The snip always ends up as one file in Pictures → Screenshots: on Windows 11 the Snipping Tool saves it, and on Windows 10 (or with the Snipping Tool's auto-save off) Purrch saves it as `Screenshot 2026-10-23 141503.png`. There is never a second copy. With no Screenshots folder yet, it is created. Cancelling the snip saves nothing.
+- [ ] With no captures, the tab mentions Win+PrtScn and Win+Shift+S.
+- [ ] Clicking a tile opens the preview: previous / next (the picture cross-fades), Copy, Open, Explorer and Delete work, and clicking outside the picture closes it. A recording shows a play button that opens your video player.
 - [ ] Hover shows Copy, Show in File Explorer and Delete. Dragging a tile into a chat or folder drops the file.
-- [ ] Delete shows "Moved to Recycle Bin" with **Undo** for 6 seconds; Undo brings it back. After that (or after leaving the tab) the file is in the Recycle Bin, not gone for good.
+- [ ] Delete shrinks the tile away and shows "Moved to Recycle Bin" with **Undo** for 6 seconds; Undo brings it back. After that (or after leaving the tab) the file is in the Recycle Bin, not gone for good.
 - [ ] **Select** lets you click several captures, then Copy or Delete them together; Select all / Deselect all work.
 - [ ] With no Screenshots folder at all, the tab says "No screenshots yet" and doesn't crash; **Open folder** opens Pictures instead.
 
@@ -346,7 +347,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Message text and whether it shows | `%APPDATA%\Purrch\message.json` |
 | Ambience volumes | `%APPDATA%\Purrch\ambience.json` |
 | Shelf (paths and file IDs only; the files stay where they are) | `%APPDATA%\Purrch\shelf.json` |
-| Captures (read from, nothing saved) | Pictures → Screenshots, Videos → Screen Recordings, Videos → Captures |
+| Captures (read from; the Screenshot button's snip is saved to Pictures → Screenshots when Windows doesn't save it) | Pictures → Screenshots, Videos → Screen Recordings, Videos → Captures |
 | File Converter format, max size and quality | `%APPDATA%\Purrch\converter.json` |
 | Converted images | Next to the originals, as `name-converted.ext` |
 | Downloads | Nothing stored; it reads your Downloads folder. Deleted files go to the Recycle Bin |

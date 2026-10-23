@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Purrch.Core;
 
@@ -40,6 +43,7 @@ public sealed class CapturesModel
     private const int Limit = 500;
     private static readonly Guid ScreenshotsFolderId = new("b7bede81-df94-4682-a7d8-57a52620b86f");
     private const uint KF_FLAG_DONT_VERIFY = 0x4000;
+    private const uint KF_FLAG_CREATE = 0x8000;
 
     private readonly DispatcherTimer _poll = new() { Interval = TimeSpan.FromSeconds(3) };
     private readonly DispatcherTimer _settle = new() { Interval = TimeSpan.FromMilliseconds(400) };
@@ -215,7 +219,9 @@ public sealed class CapturesModel
 
     // MARK: - Actions
 
-    /// Opens the Windows screen snip (the same as Win+Shift+S) once the panel has folded away.
+    /// Opens the Windows screen snip (the same as Win+Shift+S) once the panel has folded away. The snip
+    /// always ends up as a file in Screenshots, like the Mac app's `screencapture -i` into the folder:
+    /// Windows 11 saves it itself, and on Windows 10 (or with auto-save off) Purrch saves the clipboard copy.
     public void TakeScreenshot()
     {
         NotchState.Shared.ForceClose();
@@ -223,10 +229,24 @@ public sealed class CapturesModel
         timer.Tick += (_, _) =>
         {
             timer.Stop();
-            try { Process.Start(new ProcessStartInfo("ms-screenclip:") { UseShellExecute = true }); }
+            try
+            {
+                Process.Start(new ProcessStartInfo("ms-screenclip:") { UseShellExecute = true });
+                SnipCatcher.Arm();
+            }
             catch (System.ComponentModel.Win32Exception e) { Log.Write($"Screen snip unavailable: {e.Message}"); }
         };
         timer.Start();
+    }
+
+    /// The Screenshots folder, created (the way File Explorer would) if it isn't there yet.
+    internal static string CreateScreenshotsFolder()
+    {
+        if (SHGetKnownFolderPath(ScreenshotsFolderId, KF_FLAG_CREATE, IntPtr.Zero, out var path) == 0 && Directory.Exists(path))
+            return path;
+        var folder = ScreenshotsFolder;
+        Directory.CreateDirectory(folder);
+        return folder;
     }
 
     /// Takes captures off the grid and offers Undo for a few seconds; after that they go to the
@@ -278,4 +298,122 @@ public sealed class CapturesModel
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern int SHGetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] Guid id, uint flags, IntPtr token, out string path);
+}
+
+/// After the Screenshot button opens the screen snip, waits up to a minute for the snip to reach the clipboard
+/// and saves it into Screenshots as "Screenshot 2026-10-23 141503.png", unless Windows saved one there itself.
+internal static class SnipCatcher
+{
+    private const int WM_CLIPBOARDUPDATE = 0x031D;
+    private static readonly IntPtr HWND_MESSAGE = new(-3);
+    private static readonly DispatcherTimer Timeout = new() { Interval = TimeSpan.FromSeconds(60) };
+    // Windows 11's Snipping Tool writes its own file a moment after the clipboard copy; give it time first.
+    private static readonly DispatcherTimer Settle = new() { Interval = TimeSpan.FromSeconds(2) };
+    private static HwndSource? _listener;
+    private static DateTime _since;
+    private static byte[]? _png;
+
+    static SnipCatcher()
+    {
+        Timeout.Tick += (_, _) => Disarm();
+        Settle.Tick += (_, _) => SaveUnlessSaved();
+    }
+
+    public static void Arm()
+    {
+        Disarm();
+        Settle.Stop();
+        _png = null;
+        _since = DateTime.UtcNow;
+        // A message-only window: invisible, never activated, exists only to receive WM_CLIPBOARDUPDATE.
+        _listener = new HwndSource(new HwndSourceParameters("Purrch snip listener") { ParentWindow = HWND_MESSAGE });
+        _listener.AddHook(WndProc);
+        if (!AddClipboardFormatListener(_listener.Handle))
+        {
+            Log.Write($"Snip listener failed ({Marshal.GetLastWin32Error()})");
+            Disarm();
+            return;
+        }
+        Timeout.Start();
+    }
+
+    private static void Disarm()
+    {
+        Timeout.Stop();
+        if (_listener == null) return;
+        RemoveClipboardFormatListener(_listener.Handle);
+        _listener.Dispose();
+        _listener = null;
+    }
+
+    private static IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        // Read a moment later: the snip may still hold the clipboard open.
+        if (msg == WM_CLIPBOARDUPDATE) Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, Grab);
+        return IntPtr.Zero;
+    }
+
+    private static void Grab()
+    {
+        // Text copied meanwhile, or the clipboard is busy: keep waiting for the picture.
+        if (_listener == null || ReadPng() is not { } png) return;
+        Disarm();
+        _png = png;
+        Settle.Start();
+    }
+
+    private static void SaveUnlessSaved()
+    {
+        Settle.Stop();
+        var png = _png;
+        _png = null;
+        if (png == null) return;
+        try
+        {
+            var folder = CapturesModel.CreateScreenshotsFolder();
+            if (SavedSince(folder, _since)) return;
+            var name = $"Screenshot {DateTime.Now:yyyy-MM-dd HHmmss}";
+            var path = Path.Combine(folder, name + ".png");
+            for (var n = 2; File.Exists(path); n++) path = Path.Combine(folder, $"{name} {n}.png");
+            using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
+            file.Write(png);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException or ArgumentException)
+        {
+            Log.Write($"Couldn't save the snip: {e.Message}");
+        }
+    }
+
+    /// Windows 11 saved the snip itself (Snipping Tool, "Automatically save screenshots").
+    private static bool SavedSince(string folder, DateTime since) =>
+        new DirectoryInfo(folder).EnumerateFiles("*", new EnumerationOptions { IgnoreInaccessible = true })
+            .Any(f => CapturesModel.ImageExtensions.Contains(f.Extension) && f.CreationTimeUtc >= since.AddSeconds(-1));
+
+    /// The clipboard picture as PNG, or null when there is none (yet).
+    private static byte[]? ReadPng()
+    {
+        try
+        {
+            // The snip offers PNG itself; that keeps it byte for byte.
+            if (System.Windows.Clipboard.GetData("PNG") is MemoryStream stream) return stream.ToArray();
+            if (!System.Windows.Clipboard.ContainsImage() || System.Windows.Clipboard.GetImage() is not { } image) return null;
+            // The clipboard bitmap's alpha is often zero although the snip is opaque; drop it.
+            var opaque = new FormatConvertedBitmap(image, PixelFormats.Bgr24, null, 0);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(opaque));
+            using var buffer = new MemoryStream();
+            encoder.Save(buffer);
+            return buffer.ToArray();
+        }
+        catch (Exception e) when (e is ExternalException or OutOfMemoryException or NotSupportedException or InvalidOperationException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool AddClipboardFormatListener(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
 }
