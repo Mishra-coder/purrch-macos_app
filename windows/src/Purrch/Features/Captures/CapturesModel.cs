@@ -169,8 +169,10 @@ public sealed class CapturesModel
         {
             _scanning = false;
             _found = t.Result;
-            Publish();
+            // Set before publishing, so the first scan's update already shows "No screenshots yet".
+            var first = !Loaded;
             Loaded = true;
+            Publish(force: first);
             if (!_rescan) return;
             _rescan = false;
             Refresh();
