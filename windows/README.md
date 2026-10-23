@@ -19,6 +19,7 @@ The project builds on macOS, but the app only runs on Windows 10 (1809 or later)
 | 9 | Screen Time and Claude Code | Done; not yet run on Windows |
 | 10 | Revenue (Stripe) and Analytics (Plausible), with your own key | Done; not yet run on Windows |
 | 11 | Home (greeting, clock, battery, weather and next event, system rings, app launcher, now playing) | Done; not yet run on Windows |
+| 12 | YouTube in the browser: Purrch's extension for Chrome, Edge, Brave and Vivaldi, browser video rows, Audio / Video modes, live video (embedded player or frames), Video on hover, theater | Done; not yet run on Windows |
 
 All 24 modules from the Mac app are in the tab bar and built.
 
@@ -71,6 +72,19 @@ Running `Purrch.exe` again with a word hands it to the copy that is already runn
 | `Purrch.exe timers` (any module: `home`, `clipboard`, `weather`, …) | Opens the panel on that module |
 | `Purrch.exe settings` | Opens Settings |
 | `Purrch.exe close` | Closes the panel, even when pinned |
+| `Purrch.exe theater` | Opens the playing browser video (or the first one open) filling the whole panel |
+| `Purrch.exe videopeek` | Opens the small live-video window |
+
+### Connect a browser (YouTube in the browser)
+
+Purrch reads and controls YouTube in Chrome, Edge, Brave and Vivaldi through its own browser extension, the Windows counterpart of the Mac app's Apple Events. Nothing is installed or registered until you ask for it:
+
+1. Open Purrch's **Settings → Behaviour** and click **Connect browser** under **YouTube in the browser**. Purrch writes the extension to `%APPDATA%\Purrch\extension`, writes `%APPDATA%\Purrch\bridge\com.purrch.bridge.json`, and registers that file as the native messaging host `com.purrch.bridge` for Chrome, Edge, Brave, Vivaldi and Chromium under `HKEY_CURRENT_USER` (no admin rights needed). The status says **Waiting for the extension**, and the steps below appear.
+2. In the browser, open `chrome://extensions` (`edge://extensions`, `brave://extensions`, `vivaldi://extensions`) and turn on **Developer mode**.
+3. Click **Load unpacked** and choose `%APPDATA%\Purrch\extension`. **Open folder** and **Copy path** in Settings help find it.
+4. Within a few seconds the status says **Connected · Chrome** (or Edge, …). Repeat steps 2 and 3 in each browser you use.
+
+**Disconnect** deletes the registry entries, the bridge manifest and the extension folder; then remove the extension on the browser's extensions page. If you move `Purrch.exe` to another folder, Settings says **Purrch moved — click Connect again**. Connect again also updates the extension's files after a Purrch update (click the reload arrow on the extensions page afterwards). See [`extension/README.md`](extension/README.md) for how the pieces fit.
 
 ## What to test on Windows
 
@@ -149,6 +163,30 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Pause Spotify, then play a YouTube video: the module switches to the video even if Windows still treats Spotify as current, and the controls act on the video.
 - [ ] While music plays, the closed pill shows the artwork on the left and moving bars on the right. A running timer takes priority over music.
 - [ ] With nothing playing, the module says "Nothing playing".
+
+**YouTube in the browser**
+
+- [ ] Before clicking anything: `HKCU\Software\Google\Chrome\NativeMessagingHosts` (and Edge's, Brave's, Vivaldi's, Chromium's) has no `com.purrch.bridge`, and `%APPDATA%\Purrch` has no `extension` or `bridge` folder, also after restarting Purrch.
+- [ ] Settings → Behaviour → YouTube in the browser says **Not connected**. **Connect browser** creates the folders and the five registry keys, and the status turns to **Waiting for the extension** with the four steps, **Open folder** and **Copy path**.
+- [ ] Loading the folder unpacked in Chrome shows the extension with ID `digijohbadkdamofjlcaobgpppepabem` and the Purrch icon, with no errors. Within a few seconds Settings says **Connected · Chrome**. Do the same in Edge: **Connected · Chrome, Edge**. Brave and Vivaldi show their own names.
+- [ ] Quit Purrch from the tray with the browser open, then start it again: within a minute the status is Connected again, without touching the browser. No `Purrch.exe` from the bridge is left in Task Manager after quitting the browser, and none opens a window.
+- [ ] Copy `Purrch.exe` to another folder and run that copy: Settings says **Purrch moved — click Connect again**; clicking it fixes it.
+- [ ] **Disconnect** removes the keys and both folders, and the status says Not connected; the browser shows the extension as broken until you remove it.
+- [ ] With Chrome or Edge open (a window, not just Edge's background process) and no extension connected, Now Playing shows a banner "Control YouTube in Chrome or Edge from the pill" with **Set up** (opens Settings → Behaviour) and an x that hides it until Purrch restarts. With no browser window open, no banner.
+- [ ] Open three YouTube tabs (a watch page, a Short, and YouTube Music) across two windows. Now Playing shows the Audio / Video switch and a "Browser videos · 3 open" card with a row each: thumbnail, title, channel · browser, a progress line with times, back 10 s, play / pause, forward 10 s, next, and show tab. A Spotify track playing at the same time shows as a small card on the left.
+- [ ] Play / pause flips at once and the tab follows; the playing row is tinted in the accent with moving bars. Back / forward 10 s, clicking along the line, and next video work. **Pause all** pauses every playing tab.
+- [ ] Show tab brings that tab and its window to the front (also from a minimised window) and closes the panel.
+- [ ] A tab that is still loading or was discarded by the browser (Memory Saver) is listed but only offers Show tab.
+- [ ] Video mode (switch at the top; it's remembered after restarting Purrch): the playing video fills the left with title and channel, a scrubber, the controls and a quality gear; the sidebar lists the open videos (clicking one switches), **Pause all** and **Full notch**. The picture is smooth (YouTube's own player, muted) and stays in step with the tab; pausing in the browser pauses it within a second. Sound comes only from the browser.
+- [ ] The controls fade out 2.5 s after the pointer stops moving (0.8 s after it leaves) and come back on movement; a thin red line stays at the bottom. Paused, they stay.
+- [ ] The quality gear opens a sheet with YouTube's levels (1080p, 720p, …; picking one changes the tab's quality) and Notch preview Smooth / Balanced / Sharp.
+- [ ] A video whose owner disabled embedding (or Windows 10 without the WebView2 Runtime) still shows a live picture, from the browser's frames, with the thumbnail until the first frame. Sharp is crisper, Smooth moves more.
+- [ ] Clicking the picture (or **Full notch**, or the expand button) opens theater: the video fills the panel, which grows taller, with an **Exit** pill. Esc leaves theater first, then a second Esc closes the panel. Moving away closes the panel; hovering again brings back theater. Closing the tab ends theater. `Purrch.exe theater` opens it from a script.
+- [ ] Settings → Behaviour → **Video on hover**: with a video playing, hovering the pill opens a small 540×352 window with the live video, its browser's name, a switch for other open videos, quality, and "All tools" (the full panel on Now Playing). Clicking the picture opens theater. With nothing playing, hovering opens the panel as usual. `Purrch.exe videopeek` opens it from a script.
+- [ ] Closed pill: while a browser video plays (and no music app does), the pill shows the video's thumbnail on the left and moving bars on the right.
+- [ ] Home's Now Playing card: with no music app playing, it shows the browser video's thumbnail with a red progress line, title, channel and play / pause; clicking the thumbnail opens Now Playing in theater.
+- [ ] With Video mode or Video on hover on, opening the panel shows the picture at once (it loads ahead); after five minutes with the panel closed, the hidden player pauses and Purrch's CPU drops back.
+- [ ] At 100%, 125% and 150% scaling the video sits exactly inside its rounded frame, also during the panel's open animation and theater's grow, with no square corners showing.
 
 **System**
 
@@ -384,17 +422,24 @@ Purrch has no client IDs of its own, so register one app with each provider firs
 | Claude Code (read from, nothing saved) | `%USERPROFILE%\.claude\projects` |
 | Last Stripe figures (the currency is in `settings.json`, the key in Credential Manager) | `%APPDATA%\Purrch\revenue.json` |
 | Last Plausible stats (site and host are in `settings.json`, the key in Credential Manager) | `%APPDATA%\Purrch\analytics.json` |
+| Now Playing mode (Audio / Video), Video on hover, preview quality | `%APPDATA%\Purrch\settings.json` |
+| Browser extension (only after **Connect browser**) | `%APPDATA%\Purrch\extension\` |
+| Native messaging host manifest (only after **Connect browser**) | `%APPDATA%\Purrch\bridge\com.purrch.bridge.json` |
+| Native messaging host registration (only after **Connect browser**) | `HKCU\Software\Google\Chrome`, `Microsoft\Edge`, `BraveSoftware\Brave-Browser`, `Vivaldi` and `Chromium`, each `\NativeMessagingHosts\com.purrch.bridge` |
+| Embedded YouTube player page (written when the live video is first needed) | `%APPDATA%\Purrch\player\player.html` |
+| Embedded player's WebView2 cache and cookies | `%LOCALAPPDATA%\Purrch\WebView2\` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys, the Google client secret and Google sign-in | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` (`anthropic`, `openai`, `gemini`, `stripe`, `plausible`, `google-client-secret`, `google-refresh-token`) |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |
 
-To reset Purrch completely, turn off the water reminder in Timers, sign out of Microsoft and Google in Settings → Integrations, quit Purrch from the tray, delete `%APPDATA%\Purrch` and the `Purrch:` entries in Credential Manager, and turn off **Purrch** in Task Manager → Startup apps (or delete the Run value).
+To reset Purrch completely, turn off the water reminder in Timers, sign out of Microsoft and Google in Settings → Integrations, click **Disconnect** under Settings → Behaviour → YouTube in the browser (if connected), quit Purrch from the tray, delete `%APPDATA%\Purrch`, `%LOCALAPPDATA%\Purrch` and the `Purrch:` entries in Credential Manager, and turn off **Purrch** in Task Manager → Startup apps (or delete the Run value).
 
 ## Project layout
 
 ```
 windows/
   Purrch.sln
+  extension/               the browser extension (Manifest V3), embedded in Purrch.exe for Connect browser
   src/Purrch/
     App.xaml(.cs)          single instance, crash log, creates the window and tray icon
     Core/                  settings, panel state, modules, live activities, Win32 calls,
@@ -415,6 +460,9 @@ How it maps to the Mac app:
 | `RootView`, `CollapsedView`, `TabBar`, `SettingsView` | the views with the same names in `Interface/` |
 | SF Symbols | Segoe Fluent Icons / Segoe MDL2 Assets glyphs (`ModuleInfo.Glyph`) |
 | MacMate AI | Assistant |
+| `BrowserMediaService` (Apple Events) | `Features/Media/BrowserMediaService`, with `BrowserBridge` (native messaging over a named pipe), `BrowserSetup` (Connect browser) and the extension in `windows/extension` |
+| `EmbeddedYouTubePlayer` (WKWebView) | `Features/Media/EmbeddedPlayerHost` (WebView2CompositionControl) |
+| `BrowserVideos` (`LiveVideoPlayer`, `VideoPeekView`, `VideoTheaterView`) | `Features/Media/LiveVideoPlayer`, `Features/Media/BrowserVideos`, `Interface/VideoViews` |
 
 ## Known limitations
 
@@ -435,4 +483,9 @@ How it maps to the Mac app:
 - Claude Code reads only `%USERPROFILE%\.claude\projects`, as the Mac app reads `~/.claude/projects`; a `CLAUDE_CONFIG_DIR` set elsewhere isn't followed. A transcript line still being written is counted on the next read, a minute later.
 - Revenue counts charges in the one currency set in Settings, and reads at most 500 charges from the last seven days, as the Mac app does.
 - The Mac app's default AI provider, Apple's on-device model, has no Windows equivalent that an unpackaged app can use (Windows' own Phi Silica model needs a packaged MSIX app and a Copilot+ PC). **Local (on-device)** stands in for it: it needs [Ollama](https://ollama.com) or Microsoft Foundry Local installed and running, with a model pulled, and its answers are only as good as that model. Claude stays the default provider on Windows. Local keeps the chat history by sending it with each question, as the cloud providers do.
+- YouTube in the browser works with Chrome, Edge, Brave, Vivaldi and Chromium through Purrch's extension. Firefox and Safari are not supported. Arc, Opera and other Chromium browsers may load the extension but aren't registered as hosts.
+- The extension is loaded unpacked (Developer mode) until it is published in the Chrome Web Store and Edge Add-ons; Chrome may remind you about developer-mode extensions at startup. It must be loaded once per browser profile.
+- The smooth picture is YouTube's embedded player in WebView2, muted and kept in step with the tab, as on the Mac. It needs the WebView2 Runtime (built into Windows 11; most Windows 10 PCs have it). Without it, or for videos whose owner disabled embedding, the picture comes from frames the extension grabs from the tab, which are less smooth and may freeze while the tab is in the background (the browser stops drawing hidden videos).
+- The embedded player is a `WebView2CompositionControl`: the pill window is transparent (layered), where the ordinary WebView2 control doesn't draw at all, and the composition control draws into WPF so it gets rounded corners and WPF controls on top. Copying its frames costs some CPU while a live video is on screen.
+- While nothing in Purrch shows a video, the browser reports positions every couple of seconds, so the rows' times move in steps; the live player gets them several times a second.
 - Analytics uses Plausible's Stats API v1, the same as the Mac app. "Live" is Plausible's realtime count of visitors in the last 5 minutes.

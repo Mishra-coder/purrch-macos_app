@@ -22,7 +22,8 @@ public sealed record LiveActivity(LiveActivityKind Kind, string Label = "", stri
 
 /// Collects live activities from the services that produce them (message, timers, downloads, media).
 /// The pill shows the highest-priority one (see <see cref="LiveActivityKind"/>), whatever order the
-/// services started in, as on the Mac: message, then timer, then download, then music.
+/// services started in, as on the Mac: message, then timer, then download, then music. Within a kind the
+/// source registered first wins, so music from the system media controls comes before a browser video.
 public sealed class LiveActivityHub
 {
     public static LiveActivityHub Shared { get; } = new();

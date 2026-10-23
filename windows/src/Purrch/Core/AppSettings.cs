@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Purrch.DesignSystem;
+using Purrch.Features.Media;
 
 namespace Purrch.Core;
 
@@ -16,6 +17,9 @@ public sealed class AppSettings : INotifyPropertyChanged
         public bool OpenOnHover { get; set; } = true;
         public bool HideInFullscreen { get; set; } = true;
         public bool ShowLiveActivities { get; set; } = true;
+        public bool VideoPeekOnHover { get; set; }
+        public string PreviewQuality { get; set; } = "balanced";
+        public string NowPlayingMode { get; set; } = "audio";
         public List<string> DisabledModules { get; set; } = new();
         public List<string> ModuleOrder { get; set; } = new();
         public string LastModule { get; set; } = "home";
@@ -90,6 +94,27 @@ public sealed class AppSettings : INotifyPropertyChanged
     {
         get => _data.ShowLiveActivities;
         set { if (_data.ShowLiveActivities != value) { _data.ShowLiveActivities = value; Changed(); } }
+    }
+
+    /// Hovering the pill while a browser video plays opens a small live window onto it instead of the panel.
+    public bool VideoPeekOnHover
+    {
+        get => _data.VideoPeekOnHover;
+        set { if (_data.VideoPeekOnHover != value) { _data.VideoPeekOnHover = value; Changed(); } }
+    }
+
+    /// How sharp versus smooth the live preview is when it shows the extension's frames.
+    public PreviewQuality PreviewQuality
+    {
+        get => Enum.TryParse<PreviewQuality>(_data.PreviewQuality, ignoreCase: true, out var q) ? q : PreviewQuality.Balanced;
+        set { if (PreviewQuality != value) { _data.PreviewQuality = value.ToString().ToLowerInvariant(); Changed(); } }
+    }
+
+    /// Now Playing's browser section: the list of videos (Audio) or the chosen one playing live (Video).
+    public MediaViewMode NowPlayingMode
+    {
+        get => Enum.TryParse<MediaViewMode>(_data.NowPlayingMode, ignoreCase: true, out var m) ? m : MediaViewMode.Audio;
+        set { if (NowPlayingMode != value) { _data.NowPlayingMode = value.ToString().ToLowerInvariant(); Changed(); } }
     }
 
     public ModuleId LastModule

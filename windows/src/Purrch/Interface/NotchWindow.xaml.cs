@@ -57,6 +57,7 @@ public partial class NotchWindow : Window
         SourceInitialized += OnSourceInitialized;
         Loaded += (_, _) =>
         {
+            Features.Media.EmbeddedPlayerHost.Shared.Install(VideoLayer);
             Position();
             ApplyTheme();
             RefreshActivity();
@@ -121,6 +122,12 @@ public partial class NotchWindow : Window
                 break;
             case nameof(NotchState.IsPeeking):
                 Render(Motion.Peek);
+                break;
+            case nameof(NotchState.IsVideoPeek):
+                Render(Motion.Open);
+                break;
+            case nameof(NotchState.TheaterVideoId):
+                Render(_state.TheaterVideoId != null ? Motion.Open : Motion.ExpoOut(0.4));
                 break;
             case nameof(NotchState.LiveActivityWing):
                 Render(Motion.Pop);
@@ -192,6 +199,8 @@ public partial class NotchWindow : Window
         var expanded = _state.IsExpanded;
         var bodyWidth = width + Flare * 2;
         var radius = expanded ? 28 : 10;
+        // The panel grows taller for theater; the video window has its own fixed size.
+        Expanded.Height = _state.TheaterVideoId != null ? NotchState.TheaterSize.Height : NotchState.ExpandedSize.Height;
 
         if (animated)
         {
@@ -208,37 +217,62 @@ public partial class NotchWindow : Window
             Shadow.Set(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, expanded ? 0.6 : 0);
         }
 
-        SwapContent(expanded, animated);
+        SwapContent(animated);
         UpdateGlow(curve);
     }
 
-    private bool _contentExpanded;
+    /// What the body shows: the closed pill, the full panel, or the small live-video window.
+    private enum Face { Collapsed, Panel, VideoPeek }
 
-    private void SwapContent(bool expanded, bool animated)
+    private Face _face;
+
+    private Face CurrentFace => !_state.IsExpanded ? Face.Collapsed : _state.IsVideoPeek ? Face.VideoPeek : Face.Panel;
+
+    private void SwapContent(bool animated)
     {
-        if (expanded == _contentExpanded && animated) return;
-        _contentExpanded = expanded;
+        var face = CurrentFace;
+        if (face == _face && animated) return;
+        _face = face;
         var fade = animated ? 1.0 : 0.0;
 
-        if (expanded)
+        if (face != Face.Collapsed)
         {
             Collapsed.Animate(OpacityProperty, 0, Motion.Linear(0.08 * fade));
-            Expanded.Visibility = Visibility.Visible;
-            Expanded.Animate(OpacityProperty, 1, Motion.Linear(0.12 * fade));
-            if (animated) Expanded.PlayEntrance();
+            FrameworkElement shown = face == Face.Panel ? Expanded : Peek;
+            shown.Visibility = Visibility.Visible;
+            if (face == Face.Panel)
+            {
+                Expanded.Animate(OpacityProperty, 1, Motion.Linear(0.12 * fade));
+                if (animated) Expanded.PlayEntrance();
+                FadeOut(Peek, Face.VideoPeek, fade);
+            }
+            else
+            {
+                Peek.Animate(OpacityProperty, 1, Motion.EaseOut(0.18 * fade), delay: 0.06 * fade);
+                if (animated) Peek.PlayEntrance();
+                FadeOut(Expanded, Face.Panel, fade);
+            }
             Surface.Sheen?.Animate(Brush.OpacityProperty, 1, Motion.ExpoOut(0.4 * fade));
             Surface.Stroke?.Animate(Brush.OpacityProperty, 1, Motion.ExpoOut(0.4 * fade));
         }
         else
         {
-            Expanded.Animate(OpacityProperty, 0, Motion.Linear(0.1 * fade), completed: () =>
-            {
-                if (!_state.IsExpanded) Expanded.Visibility = Visibility.Collapsed;
-            });
+            FadeOut(Expanded, Face.Panel, fade);
+            FadeOut(Peek, Face.VideoPeek, fade);
             Collapsed.Animate(OpacityProperty, 1, Motion.Linear(0.25 * fade), delay: 0.15 * fade);
             Surface.Sheen?.Animate(Brush.OpacityProperty, 0, Motion.Linear(0.15 * fade));
             Surface.Stroke?.Animate(Brush.OpacityProperty, 0, Motion.Linear(0.15 * fade));
         }
+    }
+
+    /// Fades a face out and takes it off screen, unless it has come back meanwhile.
+    private void FadeOut(FrameworkElement element, Face face, double fade)
+    {
+        if (element.Visibility != Visibility.Visible) return;
+        element.Animate(OpacityProperty, 0, Motion.Linear(0.1 * fade), completed: () =>
+        {
+            if (_face != face) element.Visibility = Visibility.Collapsed;
+        });
     }
 
     /// Theme glow around the open panel; a slow breathing glow around the closed pill while something is live.
@@ -302,10 +336,12 @@ public partial class NotchWindow : Window
         e.Handled = true;
     }
 
+    /// Esc leaves theater first, then closes the panel.
     private void OnKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Escape || !_state.IsExpanded) return;
-        _state.ForceClose();
+        if (_state.TheaterVideoId != null && !_state.IsVideoPeek) _state.ExitTheater();
+        else _state.ForceClose();
         e.Handled = true;
     }
 
@@ -351,7 +387,11 @@ public partial class NotchWindow : Window
                 if ((now - start).TotalSeconds > 0.16)
                 {
                     _hoverStart = null;
-                    _state.Open();
+                    // Video on hover: straight to the playing browser video instead of the last tool.
+                    if (_settings.VideoPeekOnHover && Features.Media.BrowserMediaService.Shared.PlayingVideo?.Controllable == true)
+                        _state.OpenVideoPeek();
+                    else
+                        _state.Open();
                 }
             }
             else

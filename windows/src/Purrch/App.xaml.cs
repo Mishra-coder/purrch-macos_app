@@ -71,7 +71,8 @@ public partial class App : Application
         base.OnExit(e);
     }
 
-    /// Opens a module ("timers"), Settings ("settings"), or closes the panel ("close"); anything else opens it.
+    /// Opens a module ("timers"), Settings ("settings"), the playing browser video in the whole panel ("theater")
+    /// or in the small video window ("videopeek"), or closes the panel ("close"); anything else opens it.
     private static void Run(string command)
     {
         var state = NotchState.Shared;
@@ -79,6 +80,16 @@ public partial class App : Application
         {
             case "close":
                 state.ForceClose();
+                break;
+            case "theater":
+                var browser = Features.Media.BrowserMediaService.Shared;
+                if ((browser.PlayingVideo ?? browser.Videos.FirstOrDefault()) is not { } video) break;
+                state.Present(ModuleId.NowPlaying);
+                state.EnterTheater(video.Id);
+                break;
+            case "videopeek":
+                state.HoldUntilHovered = true;
+                state.OpenVideoPeek();
                 break;
             case "settings":
                 state.Present(settings: true);

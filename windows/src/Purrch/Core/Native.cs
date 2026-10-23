@@ -18,6 +18,8 @@ internal static class Native
     public static readonly IntPtr HWND_TOPMOST = new(-1);
     /// SHQueryUserNotificationState: a Direct3D game or video owns the screen.
     public const int QUNS_RUNNING_D3D_FULL_SCREEN = 3;
+    /// AllowSetForegroundWindow: any process may take the foreground next (the browser, for Show tab).
+    public const int ASFW_ANY = -1;
 
     [StructLayout(LayoutKind.Sequential)]
     public struct POINT { public int X, Y; }
@@ -60,6 +62,9 @@ internal static class Native
 
     [DllImport("user32.dll")]
     public static extern bool IsWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool AllowSetForegroundWindow(int processId);
 
     [DllImport("user32.dll")]
     public static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);

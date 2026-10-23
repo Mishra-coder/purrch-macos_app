@@ -27,6 +27,7 @@ public partial class ExpandedView : UserControl
         RefreshSettingsButton();
         RefreshContent(animated: false);
         RefreshOnboarding();
+        RefreshTheater(animated: false);
     }
 
     /// Staggered entrance each time the panel opens: header, then content, then the tab bar.
@@ -61,6 +62,9 @@ public partial class ExpandedView : UserControl
                 break;
             case nameof(NotchState.IsPinned):
                 RefreshPin();
+                break;
+            case nameof(NotchState.TheaterVideoId):
+                RefreshTheater(animated: true);
                 break;
         }
     }
@@ -125,9 +129,49 @@ public partial class ExpandedView : UserControl
         SettingsSpin.Animate(RotateTransform.AngleProperty, _state.ShowSettings ? 90 : 0, Motion.ExpoOut(0.45));
     }
 
+    /// Theater swaps the header, module and tab bar for the video; leaving it brings them back. The module
+    /// is collapsed meanwhile, so a player in it hands the picture over to theater's.
+    private void RefreshTheater(bool animated)
+    {
+        var theater = _state.TheaterVideoId != null;
+        if (theater == (TheaterArea.Visibility == Visibility.Visible)) return;
+        var panel = new FrameworkElement[] { Header, ContentArea, TabBarArea };
+        if (theater)
+        {
+            TheaterArea.Children.Clear();
+            TheaterArea.Children.Add(new VideoTheaterView());
+            TheaterArea.Visibility = Visibility.Visible;
+            foreach (var part in panel) part.Visibility = Visibility.Hidden;
+            ContentArea.Visibility = Visibility.Collapsed;
+            if (!animated) return;
+            TheaterArea.Opacity = 0;
+            TheaterScale.ScaleX = TheaterScale.ScaleY = 0.92;
+            TheaterArea.Animate(OpacityProperty, 1, Motion.ExpoOut(0.4));
+            TheaterScale.Animate(ScaleTransform.ScaleXProperty, 1, Motion.Open);
+            TheaterScale.Animate(ScaleTransform.ScaleYProperty, 1, Motion.Open);
+        }
+        else
+        {
+            TheaterArea.Visibility = Visibility.Collapsed;
+            TheaterArea.Children.Clear();
+            foreach (var part in panel)
+            {
+                part.Visibility = Visibility.Visible;
+                if (animated)
+                {
+                    part.Opacity = 0;
+                    part.Animate(OpacityProperty, 1, Motion.ExpoOut(0.4));
+                }
+            }
+            RefreshOnboarding();
+        }
+    }
+
     /// The tab bar waits until the welcome screen has been dismissed.
     private void RefreshOnboarding() =>
-        TabBarArea.Visibility = _settings.HasCompletedOnboarding ? Visibility.Visible : Visibility.Collapsed;
+        TabBarArea.Visibility = !_settings.HasCompletedOnboarding ? Visibility.Collapsed
+            : _state.TheaterVideoId != null ? Visibility.Hidden
+            : Visibility.Visible;
 
     private void RefreshContent(bool animated, bool force = false)
     {

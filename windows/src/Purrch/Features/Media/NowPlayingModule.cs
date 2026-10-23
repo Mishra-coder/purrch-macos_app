@@ -10,12 +10,18 @@ using Purrch.Interface;
 
 namespace Purrch.Features.Media;
 
-/// Big artwork, track details, a scrubber and transport controls over a blurred copy of the artwork.
+/// Big artwork, track details, a scrubber and transport controls over a blurred copy of the artwork. With
+/// YouTube open in a browser (through Purrch's extension), the browser section takes over, with this app's
+/// track as a small card beside it.
 public sealed class NowPlayingModule : ContentControl
 {
     private readonly NowPlayingService _player = NowPlayingService.Shared;
+    private readonly BrowserMediaService _browser = BrowserMediaService.Shared;
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private Scrubber? _scrubber;
+    private BrowserMediaSection? _section;
+    private bool _banner;
+    private int _ticks;
     /// Shared by every rebuilt artwork, so play/pause springs it from where it was instead of jumping.
     private readonly ScaleTransform _artScale = new(1, 1);
     private bool? _artPlaying;
@@ -23,19 +29,64 @@ public sealed class NowPlayingModule : ContentControl
     public NowPlayingModule()
     {
         Rebuild();
-        _clock.Tick += (_, _) => _scrubber?.Update();
-        Loaded += (_, _) => { _player.Changed += Rebuild; _clock.Start(); Rebuild(); };
-        Unloaded += (_, _) => { _player.Changed -= Rebuild; _clock.Stop(); };
+        _clock.Tick += (_, _) =>
+        {
+            _scrubber?.Update();
+            // Every few seconds: has a browser window opened or closed (the setup banner)?
+            if (++_ticks % 16 == 0 && _section == null && BrowserBanner.Wanted != _banner) Rebuild();
+        };
+        Loaded += (_, _) =>
+        {
+            _player.Changed += Rebuild;
+            _browser.Changed += OnBrowserChanged;
+            _clock.Start();
+            _browser.Refresh();
+            Rebuild();
+        };
+        Unloaded += (_, _) =>
+        {
+            _player.Changed -= Rebuild;
+            _browser.Changed -= OnBrowserChanged;
+            _clock.Stop();
+        };
+    }
+
+    /// Browser reports come often; while the section shows they only update it.
+    private void OnBrowserChanged()
+    {
+        if (_section != null && _browser.Videos.Count > 0) _section.Refresh();
+        else Rebuild();
     }
 
     private void Rebuild()
     {
+        if (_browser.Videos.Count > 0)
+        {
+            _scrubber = null;
+            var music = _player.HasTrack ? CompactTrack() : null;
+            if (_section == null)
+            {
+                _artPlaying = null;
+                _section = new BrowserMediaSection(music);
+                Content = _section;
+            }
+            else
+            {
+                _section.SetMusicCard(music);
+                _section.Refresh();
+            }
+            return;
+        }
+        _section = null;
+        _banner = BrowserBanner.Wanted;
+
         if (!_player.HasTrack)
         {
             _scrubber = null;
             _artPlaying = null;
-            Content = new Card("Now Playing", "\uE8D6",
+            var empty = new Card("Now Playing", "\uE8D6",
                 Ui.EmptyState("\uE8D6", "Nothing playing", "Play something in Spotify, a browser or any media app"));
+            Content = WithBanner(empty, compact: false);
             return;
         }
 
@@ -43,7 +94,8 @@ public sealed class NowPlayingModule : ContentControl
         root.Children.Add(Backdrop());
 
         var layout = new DockPanel { Margin = new Thickness(16) };
-        var art = Artwork(236);
+        // A little smaller with the setup banner above, so everything still fits.
+        var art = Artwork(_banner ? 196 : 236);
         art.Margin = new Thickness(0, 0, 22, 0);
         DockPanel.SetDock(art, Dock.Left);
         layout.Children.Add(art);
@@ -54,7 +106,55 @@ public sealed class NowPlayingModule : ContentControl
         card.SetResourceReference(Border.BorderBrushProperty, ThemeResources.Border);
         // Round the backdrop's corners too.
         root.SizeChanged += (_, _) => root.Clip = new RectangleGeometry(new Rect(root.RenderSize), 20, 20);
-        Content = card;
+        Content = WithBanner(card, compact: true);
+    }
+
+    /// Puts the "control YouTube from the pill" banner above `content` while it is wanted.
+    private UIElement WithBanner(UIElement content, bool compact)
+    {
+        if (!_banner) return content;
+        var stack = new DockPanel();
+        var banner = new BrowserBanner(Rebuild, compact) { Margin = new Thickness(0, 0, 0, 8) };
+        DockPanel.SetDock(banner, Dock.Top);
+        stack.Children.Add(banner);
+        stack.Children.Add(content);
+        return stack;
+    }
+
+    /// Small card for the music app, shown beside the browser video list.
+    private UIElement CompactTrack()
+    {
+        var root = new Grid { ClipToBounds = true };
+        root.Children.Add(Backdrop());
+        var stack = new StackPanel { Margin = new Thickness(12), VerticalAlignment = VerticalAlignment.Center };
+        var art = Artwork(120);
+        art.HorizontalAlignment = HorizontalAlignment.Center;
+        stack.Children.Add(art);
+        var title = Line(_player.Title, 14, ThemeResources.Text, FontWeights.Bold);
+        title.HorizontalAlignment = HorizontalAlignment.Center;
+        title.Margin = new Thickness(0, 10, 0, 0);
+        stack.Children.Add(title);
+        var artist = Line(_player.Artist, 12, ThemeResources.SecondaryText, FontWeights.Normal);
+        artist.HorizontalAlignment = HorizontalAlignment.Center;
+        artist.Margin = new Thickness(0, 2, 0, 0);
+        stack.Children.Add(artist);
+        var controls = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 10, 0, 0) };
+        var previous = Ui.IconButton("\uE892", 30, _player.Previous, tooltip: "Previous");
+        var play = Ui.IconButton(_player.IsPlaying ? "\uE769" : "\uE768", 40, _player.TogglePlayPause, prominent: true,
+            tooltip: _player.IsPlaying ? "Pause" : "Play");
+        var next = Ui.IconButton("\uE893", 30, _player.Next, tooltip: "Next");
+        play.Margin = new Thickness(12, 0, 12, 0);
+        previous.VerticalAlignment = next.VerticalAlignment = VerticalAlignment.Center;
+        controls.Children.Add(previous);
+        controls.Children.Add(play);
+        controls.Children.Add(next);
+        stack.Children.Add(controls);
+        root.Children.Add(stack);
+
+        var card = new Border { CornerRadius = new CornerRadius(18), BorderThickness = new Thickness(0.8), Child = root };
+        card.SetResourceReference(Border.BorderBrushProperty, ThemeResources.Border);
+        root.SizeChanged += (_, _) => root.Clip = new RectangleGeometry(new Rect(root.RenderSize), 18, 18);
+        return card;
     }
 
     private UIElement Details()

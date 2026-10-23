@@ -70,5 +70,12 @@
                 <TranslateTransform x:Name="TabBarShift" />
             </Grid.RenderTransform>
         </Grid>
+
+        <!-- Theater: a browser video filling the whole panel, over the header, module and tab bar. -->
+        <Grid x:Name="TheaterArea" Grid.RowSpan="3" Visibility="Collapsed" RenderTransformOrigin="0.5,0">
+            <Grid.RenderTransform>
+                <ScaleTransform x:Name="TheaterScale" />
+            </Grid.RenderTransform>
+        </Grid>
     </Grid>
 </UserControl>

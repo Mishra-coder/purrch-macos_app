@@ -23,6 +23,9 @@ public sealed class SettingsView : Grid
     /// The Local server's status on the AI page.
     private TextBlock? _localStatus;
     private int _localCheck;
+    /// Behaviour's browser connection block, rebuilt as browsers connect and leave.
+    private readonly StackPanel _browserBlock = new();
+    private string? _browserError;
 
     public SettingsView()
     {
@@ -48,8 +51,21 @@ public sealed class SettingsView : Grid
 
         Show(_section);
         // Reset order changes the list under the toggles; listen only while on screen.
-        Loaded += (_, _) => _settings.PropertyChanged += OnSettingsChanged;
-        Unloaded += (_, _) => _settings.PropertyChanged -= OnSettingsChanged;
+        Loaded += (_, _) =>
+        {
+            _settings.PropertyChanged += OnSettingsChanged;
+            Features.Media.BrowserBridge.Shared.Changed += OnBrowsersChanged;
+        };
+        Unloaded += (_, _) =>
+        {
+            _settings.PropertyChanged -= OnSettingsChanged;
+            Features.Media.BrowserBridge.Shared.Changed -= OnBrowsersChanged;
+        };
+    }
+
+    private void OnBrowsersChanged()
+    {
+        if (_section == Section.Behaviour) RefreshBrowserBlock();
     }
 
     /// Opens the panel's settings on a section, for a module's "Open Settings" button.
@@ -97,8 +113,15 @@ public sealed class SettingsView : Grid
                     _settings.HideInFullscreen, v => _settings.HideInFullscreen = v));
                 Add(Toggle("Live activities", "Messages, timers, downloads and music in the closed pill.",
                     _settings.ShowLiveActivities, v => _settings.ShowLiveActivities = v));
+                Add(Toggle("Video on hover", "Hovering the pill jumps straight to the playing YouTube video instead of your last tool.",
+                    _settings.VideoPeekOnHover, v => _settings.VideoPeekOnHover = v));
                 Add(Toggle("Launch at startup", "Start Purrch automatically when you sign in to Windows.",
                     _settings.LaunchAtStartup, v => _settings.LaunchAtStartup = v));
+                Add(Heading("YouTube in the browser"));
+                Add(_browserBlock);
+                RefreshBrowserBlock();
+                Add(Heading("Preview quality"));
+                Add(PreviewQualityPicker());
                 break;
             case Section.Modules:
                 BuildModules();
@@ -116,6 +139,133 @@ public sealed class SettingsView : Grid
                 BuildAbout();
                 break;
         }
+    }
+
+    /// Connect browser / Disconnect, the connection status, and how to load the extension. Nothing is written
+    /// to the registry or %APPDATA% until Connect browser is clicked.
+    private void RefreshBrowserBlock()
+    {
+        var setup = Features.Media.BrowserSetup.Current;
+        var browsers = Features.Media.BrowserBridge.Shared.ConnectedBrowsers;
+        _browserBlock.Children.Clear();
+        _browserBlock.Children.Add(Ui.Text("Lists and controls the YouTube videos open in Chrome, Edge, Brave and Vivaldi, with a " +
+                                           "live picture in the pill. It needs Purrch's browser extension; nothing is set up until " +
+                                           "you click Connect browser.", 11, ThemeResources.SecondaryText));
+
+        var (status, good) = setup switch
+        {
+            Features.Media.BrowserSetup.State.NotConnected => ("Not connected", false),
+            Features.Media.BrowserSetup.State.Moved => ("Purrch moved — click Connect again", false),
+            _ when browsers.Count > 0 => ($"Connected \u00B7 {string.Join(", ", browsers)}", true),
+            _ => ("Waiting for the extension", false),
+        };
+        var dot = new System.Windows.Shapes.Ellipse { Width = 8, Height = 8, Margin = new Thickness(0, 0, 8, 0) };
+        dot.Fill = (good ? Color.FromRgb(0x30, 0xD1, 0x58) : setup == Features.Media.BrowserSetup.State.NotConnected
+            ? Colors.Gray : Color.FromRgb(0xFF, 0x9F, 0x0A)).Brush();
+        var statusRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        statusRow.Children.Add(dot);
+        statusRow.Children.Add(Ui.Text(status, 13));
+
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        if (setup != Features.Media.BrowserSetup.State.Registered)
+        {
+            buttons.Children.Add(Ui.Pill(setup == Features.Media.BrowserSetup.State.Moved ? "Connect again" : "Connect browser", "\uE71B", () =>
+            {
+                _browserError = Features.Media.BrowserSetup.Connect();
+                RefreshBrowserBlock();
+            }, prominent: true));
+        }
+        if (setup != Features.Media.BrowserSetup.State.NotConnected)
+        {
+            var disconnect = Ui.Pill("Disconnect", "\uE711", () =>
+            {
+                _browserError = null;
+                Features.Media.BrowserSetup.Disconnect();
+                RefreshBrowserBlock();
+            });
+            disconnect.Margin = new Thickness(8, 0, 0, 0);
+            buttons.Children.Add(disconnect);
+        }
+        var row = new DockPanel();
+        DockPanel.SetDock(buttons, Dock.Right);
+        row.Children.Add(buttons);
+        row.Children.Add(statusRow);
+        var card = Ui.Row(row);
+        card.Margin = new Thickness(0, 10, 0, 0);
+        _browserBlock.Children.Add(card);
+
+        if (_browserError != null)
+        {
+            var error = Ui.Text($"Couldn't connect: {_browserError}", 11, ThemeResources.SecondaryText);
+            error.Foreground = Color.FromRgb(0xFF, 0x45, 0x3A).Brush();
+            error.Margin = new Thickness(0, 6, 0, 0);
+            _browserBlock.Children.Add(error);
+        }
+        if (setup == Features.Media.BrowserSetup.State.NotConnected) return;
+
+        // How to load the unpacked extension, until it is in the Chrome Web Store and Edge Add-ons.
+        var folder = Features.Media.BrowserSetup.ExtensionFolder;
+        var steps = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
+        steps.Children.Add(Ui.Text("Load the extension in each browser you use:", 12, weight: FontWeights.SemiBold));
+        steps.Children.Add(Step(1, "Open chrome://extensions (Edge: edge://extensions, Brave: brave://extensions, Vivaldi: vivaldi://extensions)."));
+        steps.Children.Add(Step(2, "Turn on Developer mode."));
+        steps.Children.Add(Step(3, "Click Load unpacked and choose this folder:"));
+        var path = Ui.Text(folder, 11, ThemeResources.SecondaryText);
+        path.FontFamily = new FontFamily("Cascadia Mono, Consolas");
+        path.Margin = new Thickness(22, 4, 0, 6);
+        steps.Children.Add(path);
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(22, 0, 0, 0) };
+        actions.Children.Add(Ui.Pill("Open folder", "\uE838", () =>
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true }); }
+            catch (System.ComponentModel.Win32Exception e) { Log.Write($"Open {folder}: {e.Message}"); }
+        }));
+        var copy = Ui.Pill("Copy path", "\uE8C8", () =>
+        {
+            try { Clipboard.SetText(folder); }
+            catch (System.Runtime.InteropServices.COMException e) { Log.Write($"Copy path: {e.Message}"); }
+        });
+        copy.Margin = new Thickness(8, 0, 0, 0);
+        actions.Children.Add(copy);
+        steps.Children.Add(actions);
+        steps.Children.Add(Step(4, "Within a few seconds the status above says Connected."));
+        _browserBlock.Children.Add(steps);
+    }
+
+    private static UIElement Step(int number, string text)
+    {
+        var row = new DockPanel { Margin = new Thickness(0, 6, 0, 0) };
+        var badge = new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(8), VerticalAlignment = VerticalAlignment.Top };
+        badge.SetResourceReference(Border.BackgroundProperty, ThemeResources.Hairline);
+        var digit = Ui.Text(number.ToString(), 10, weight: FontWeights.Bold);
+        digit.HorizontalAlignment = HorizontalAlignment.Center;
+        badge.Child = digit;
+        DockPanel.SetDock(badge, Dock.Left);
+        row.Children.Add(badge);
+        var label = Ui.Text(text, 11.5, ThemeResources.SecondaryText);
+        label.Margin = new Thickness(6, 0, 0, 0);
+        row.Children.Add(label);
+        return row;
+    }
+
+    /// Smooth / Balanced / Sharp for the live preview when it shows the extension's frames.
+    private UIElement PreviewQualityPicker()
+    {
+        var stack = new StackPanel();
+        var pills = new WrapPanel();
+        foreach (var quality in Enum.GetValues<Features.Media.PreviewQuality>())
+        {
+            var q = quality;
+            var on = _settings.PreviewQuality == quality;
+            var pill = Ui.Pill(quality.ToString(), on ? "\uE73E" : "\uE714",
+                () => { _settings.PreviewQuality = q; Show(Section.Behaviour); }, prominent: on);
+            pill.Margin = new Thickness(0, 0, 8, 6);
+            pills.Children.Add(pill);
+        }
+        stack.Children.Add(pills);
+        stack.Children.Add(Ui.Text("Used when YouTube's own player can't be embedded and the picture comes from the browser: " +
+                                   "Smooth moves more frames, Sharp shows more detail.", 11, ThemeResources.SecondaryText));
+        return stack;
     }
 
     private void BuildNav()

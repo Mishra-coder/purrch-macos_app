@@ -25,6 +25,7 @@ public sealed class HomeModule : Grid
     private readonly CalendarService _calendar = CalendarService.Shared;
     private readonly WeatherService _weather = WeatherService.Shared;
     private readonly NowPlayingService _player = NowPlayingService.Shared;
+    private readonly BrowserMediaService _browser = BrowserMediaService.Shared;
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1) };
 
     private readonly TextBlock _greeting = Ui.Text("", 12, ThemeResources.SecondaryText, FontWeights.Medium);
@@ -61,6 +62,7 @@ public sealed class HomeModule : Grid
             _calendar.Changed += RefreshChips;
             _weather.Changed += RefreshChips;
             _player.Changed += RefreshPlaying;
+            _browser.Changed += RefreshPlaying;
             LauncherStore.Shared.Changed += RefreshApps;
             _monitor.Start();
             _calendar.Start();
@@ -77,6 +79,7 @@ public sealed class HomeModule : Grid
             _calendar.Changed -= RefreshChips;
             _weather.Changed -= RefreshChips;
             _player.Changed -= RefreshPlaying;
+            _browser.Changed -= RefreshPlaying;
             LauncherStore.Shared.Changed -= RefreshApps;
             _monitor.Stop();
             _calendar.Stop();
@@ -380,6 +383,11 @@ public sealed class HomeModule : Grid
     private void RefreshPlaying()
     {
         var open = Ui.Bare(Ui.Glyph("\uE8A7", 11, ThemeResources.SecondaryText), () => Go(ModuleId.NowPlaying), "Open Now Playing");
+        if (!_player.HasTrack && (_browser.PlayingVideo ?? _browser.Videos.FirstOrDefault()) is { } video)
+        {
+            _playing.Content = new Card("Now Playing", "\uE8D6", VideoBody(video), open);
+            return;
+        }
         if (!_player.HasTrack)
         {
             _playing.Content = new Card("Now Playing", "\uE8D6",
@@ -425,6 +433,64 @@ public sealed class HomeModule : Grid
         body.Children.Add(track);
         body.Children.Add(controls);
         _playing.Content = new Card("Now Playing", "\uE8D6", body, open);
+    }
+
+    /// A YouTube video from the browser, when no music app is playing: its thumbnail (click to watch it in the
+    /// whole notch) with a progress line, title, channel and play / pause.
+    private UIElement VideoBody(BrowserVideo video)
+    {
+        var thumb = new Grid { Height = 70, ClipToBounds = true, Cursor = video.Controllable ? Cursors.Hand : null };
+        var picture = new Border { CornerRadius = new CornerRadius(10) };
+        picture.SetResourceReference(Border.BackgroundProperty, ThemeResources.Hairline);
+        VideoThumbnails.Into(video.ThumbnailUrl, image => picture.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill });
+        thumb.Children.Add(picture);
+        var line = new Border
+        {
+            Height = 3,
+            CornerRadius = new CornerRadius(1.5),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Background = Color.FromRgb(0xFF, 0x3B, 0x30).Brush(),
+        };
+        thumb.SizeChanged += (_, _) => line.Width = thumb.ActualWidth * video.Progress;
+        thumb.Children.Add(line);
+        thumb.SizeChanged += (_, _) => thumb.Clip = new RectangleGeometry(new Rect(thumb.RenderSize), 10, 10);
+        if (video.Controllable)
+        {
+            thumb.ToolTip = "Watch in the notch";
+            thumb.MouseLeftButtonUp += (_, _) =>
+            {
+                NotchState.Shared.Select(ModuleId.NowPlaying);
+                NotchState.Shared.EnterTheater(video.Id);
+            };
+        }
+
+        var title = Ui.Text(video.Title, 12, weight: FontWeights.SemiBold);
+        var channel = Ui.Text(video.Channel.Length == 0 ? video.Browser : video.Channel, 10.5, ThemeResources.SecondaryText);
+        foreach (var t in new[] { title, channel })
+        {
+            t.TextWrapping = TextWrapping.NoWrap;
+            t.TextTrimming = TextTrimming.CharacterEllipsis;
+        }
+        var names = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        names.Children.Add(title);
+        names.Children.Add(channel);
+        var row = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
+        if (video.Controllable)
+        {
+            var play = Ui.IconButton(video.IsPlaying ? "\uE769" : "\uE768", 28, () => _browser.Toggle(video), prominent: true,
+                tooltip: video.IsPlaying ? "Pause" : "Play");
+            play.Margin = new Thickness(8, 0, 0, 0);
+            play.VerticalAlignment = VerticalAlignment.Center;
+            DockPanel.SetDock(play, Dock.Right);
+            row.Children.Add(play);
+        }
+        row.Children.Add(names);
+
+        var body = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        body.Children.Add(thumb);
+        body.Children.Add(row);
+        return body;
     }
 }
 

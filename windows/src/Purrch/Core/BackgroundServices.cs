@@ -18,6 +18,9 @@ public static class BackgroundServices
         DownloadsService.Shared.Start();
         ClipboardService.Shared.Start();
         NowPlayingService.Shared.Start();
+        // Only listens for the extension; the browser side is set up from Settings, never here.
+        BrowserMediaService.Shared.Start();
+        EmbeddedPlayerHost.Shared.StartPrewarming();
         ScreenTimeService.Shared.Start();
         // Keeps the forecast fresh for Home's chip. It never calls Stop, so this counts as a user for good.
         WeatherService.Shared.Start();

@@ -19,6 +19,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- WFAC010 is a WinForms hint; WPF takes per-monitor DPI from the manifest. -->
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
+    <!-- WebView2 ships API docs; keep them out of the published folder, so a single-file publish is just Purrch.exe. -->
+    <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
     <Version>0.1.0</Version>
     <Product>Purrch</Product>
     <Company>Devendra Mishra</Company>
@@ -55,6 +57,8 @@
     <PackageReference Include="Microsoft.Identity.Client" Version="4.91.1" />
     <!-- DPAPI, which keeps the Microsoft sign-in cache encrypted for this Windows user. -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <!-- The muted YouTube player that mirrors a browser video in the pill (WebView2CompositionControl). -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
   </ItemGroup>
 
 </Project>

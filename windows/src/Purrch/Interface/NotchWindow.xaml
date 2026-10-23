@@ -4,7 +4,7 @@
         xmlns:ds="clr-namespace:Purrch.DesignSystem"
         xmlns:ui="clr-namespace:Purrch.Interface"
         Title="Purrch"
-        Width="880" Height="480"
+        Width="880" Height="540"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" Topmost="True" ShowInTaskbar="False" ShowActivated="False"
         FontFamily="{StaticResource Purrch.Font}" UseLayoutRounding="True">
@@ -24,10 +24,15 @@
             </Grid>
             <!-- Content sits between the top flares and is clipped to the growing body. -->
             <Grid x:Name="ContentClip" Margin="10,0,10,0" ClipToBounds="True">
+                <!-- The embedded YouTube player lives here, under the content, and shows through players' picture areas. -->
+                <Canvas x:Name="VideoLayer" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False" />
                 <ui:CollapsedView x:Name="Collapsed" />
                 <ui:ExpandedView x:Name="Expanded" Width="780" Height="420"
                                  HorizontalAlignment="Center" VerticalAlignment="Top"
                                  Opacity="0" Visibility="Collapsed" />
+                <ui:VideoPeekView x:Name="Peek" Width="540" Height="352"
+                                  HorizontalAlignment="Center" VerticalAlignment="Top"
+                                  Opacity="0" Visibility="Collapsed" />
             </Grid>
         </Grid>
     </Grid>
