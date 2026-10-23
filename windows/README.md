@@ -154,6 +154,14 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Turning it off, or switching off **Live activities** in Settings, brings back the timer or music. With an empty box the switch can't be turned on.
 - [ ] The text and the switch are the same after quitting and reopening Purrch.
 
+**Ambience**
+
+- [ ] Each of the ten tiles plays its sound and fades in over about a second; tapping again fades it out. Several can play at once, and the header says how many.
+- [ ] Each tile's slider and the master slider change the volume smoothly, with no clicks or crackle; the mouse wheel nudges them. Volumes are kept after a restart.
+- [ ] **Stop all** fades everything out. Sounds keep playing with the panel closed or on another module.
+- [ ] With no speakers or headphones (or audio turned off in Device Manager), tapping a tile does nothing and Purrch doesn't crash; `purrch.log` says "no audio output".
+- [ ] Quitting from the tray while sounds play stops them at once. A few seconds after everything stops, Purrch's CPU use in Task Manager drops back to about zero.
+
 **Tray, startup and full screen**
 
 - [ ] Tray icon: left-click opens the panel. Right-click shows **Open Purrch**, **Settings** and **Quit Purrch**, and each one works.
@@ -173,6 +181,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Units category and the two units picked | `%APPDATA%\Purrch\units.json` |
 | Links: saved sites and search engine | `%APPDATA%\Purrch\links.json` |
 | Message text and whether it shows | `%APPDATA%\Purrch\message.json` |
+| Ambience volumes | `%APPDATA%\Purrch\ambience.json` |
 | Log (startup and unhandled errors) | `%APPDATA%\Purrch\purrch.log` |
 | API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |

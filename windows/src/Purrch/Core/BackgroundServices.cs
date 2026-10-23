@@ -22,5 +22,6 @@ public static class BackgroundServices
         NotesStore.Shared.Flush();
         ScratchpadStore.Shared.Flush();
         MessageService.Shared.Flush();
+        AmbienceEngine.Shutdown();
     }
 }

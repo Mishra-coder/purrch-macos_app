@@ -174,6 +174,7 @@ public partial class ExpandedView : UserControl
             ModuleId.Links => new Features.Links.LinksModule(),
             ModuleId.NowPlaying => new Features.Media.NowPlayingModule(),
             ModuleId.Message => new Features.Media.MessageModule(),
+            ModuleId.Ambience => new Features.Media.AmbienceModule(),
             ModuleId.System => new Features.Insights.SystemModule(),
             ModuleId.Assistant => new Features.Assistant.AssistantModule(),
             ModuleId.Translate => new Features.Translate.TranslateModule(),
