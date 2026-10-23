@@ -111,11 +111,13 @@ None of this has run on a real Windows machine yet. Please go through the list a
 
 **Timers**
 
-- [ ] Pomodoro: start, pause, reset and skip work, and the ring empties as time passes. The arrows change the focus and break minutes.
-- [ ] Timer: the 5m, 10m and 25m chips start a countdown, and minus and plus change the custom length. When it ends, a chime plays, a Windows notification appears and the panel opens on Timers.
+- [ ] Pomodoro: start, pause, reset and skip work, and the ring empties as time passes. The arrows change the focus and break minutes. In Molten, Tech HUD and Blood Moon the ring's arc glows (the faint track doesn't).
+- [ ] Timer: the 5m, 10m and 25m chips start a countdown, and minus and plus change the custom length. Each new number slides down into place and fades in. When it ends, a chime plays, a Windows notification with its sound appears and the panel opens on Timers.
+- [ ] Timer and pomodoro notifications show "Purrch" with its icon and stay in the notification centre (Win+N). Clicking one there, also after closing the panel, opens Purrch on Timers. With Purrch quit, clicking a water reminder starts it and opens Timers.
 - [ ] While a pomodoro or countdown runs, the closed pill shows the time on the right and an icon on the left, with a soft glow.
 - [ ] Stopwatch: start, lap, pause and reset. Laps are listed newest first.
-- [ ] Water: tapping drops fills them, and the count is still the same after restarting Purrch. With the switch on, a reminder notification comes every 30 minutes.
+- [ ] Water: tapping drops fills them; a drop that fills springs slightly larger (and glows in glow themes), one that empties shrinks back. The count is still the same after restarting Purrch.
+- [ ] With the switch on, a "Drink some water 💧" notification with sound comes every 30 minutes, also after quitting Purrch (for up to eight hours). Restarting Purrch keeps the same rhythm instead of starting the 30 minutes again. Turning the switch off stops them, including those already queued.
 
 **Clipboard**
 
@@ -329,6 +331,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | Notes, Scratchpad | `%APPDATA%\Purrch\notes.json`, `scratchpad.json` |
 | Units category and the two units picked | `%APPDATA%\Purrch\units.json` |
 | Links: saved sites and search engine | `%APPDATA%\Purrch\links.json` |
+| Water reminders still to come (up to 16) | Windows' notification schedule |
 | Message text and whether it shows | `%APPDATA%\Purrch\message.json` |
 | Ambience volumes | `%APPDATA%\Purrch\ambience.json` |
 | Shelf (paths only; the files stay where they are) | `%APPDATA%\Purrch\shelf.json` |
@@ -346,7 +349,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 | API keys | Windows Credential Manager → Windows Credentials, entries named `Purrch:<name>` (`anthropic`, `openai`, `gemini`, `stripe`, `plausible`) |
 | Launch at startup | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Purrch` |
 
-To reset Purrch completely, quit it from the tray, delete `%APPDATA%\Purrch`, and turn off **Purrch** in Task Manager → Startup apps (or delete the Run value).
+To reset Purrch completely, turn off the water reminder in Timers, quit Purrch from the tray, delete `%APPDATA%\Purrch`, and turn off **Purrch** in Task Manager → Startup apps (or delete the Run value).
 
 ## Project layout
 
@@ -382,6 +385,7 @@ How it maps to the Mac app:
 - Chrome, Edge and Firefox don't write the expected size of a download next to the file, so download progress is estimated (as it is for Chrome on the Mac) and the percentage shows as "…".
 - Dragging files onto the closed pill opens the Shelf. To drop images on the File Converter, pin the panel first: pressing the mouse in File Explorer to start the drag closes an unpinned panel.
 - The exe is not code-signed, so SmartScreen warns on first run.
+- Water reminders are queued with Windows eight hours ahead, and topped up while Purrch runs. If Purrch isn't started for longer than that, they pause until it runs again.
 - Calendar reads iCal links and .ics files, so it shows events but can't change them, and a published link can lag Google or Outlook by a few hours. Windows' own calendar store needs a packaged (MSIX) app.
 - Screen Time counts the app in front, so a window you are only reading or watching counts until the 2-minute idle limit, as on the Mac. Store apps are grouped by their app ID and other apps by the exe's full path. Store apps recorded by an older build stay under their old exe-name entry for the days already recorded.
 - Windows doesn't tell apps how hot the machine is, so System's **Thermal** row is estimated from CPU throttling (how far the processor's speed limit, or its speed under load, sits below its maximum). It never says Critical, and a PC that throttles for power rather than heat shows the same.

@@ -2,7 +2,6 @@ using System.IO;
 using System.Media;
 using System.Windows.Threading;
 using Purrch.Core;
-using Purrch.Interface;
 
 namespace Purrch.Features.Timers;
 
@@ -25,7 +24,11 @@ public static class PomodoroPhaseInfo
 /// running (and show in the closed pill) while the panel is shut.
 public sealed class TimerService
 {
-    private const string WaterReminderTitle = "Drink some water";
+    private const string WaterReminderTitle = "Drink some water 💧";
+    private const string WaterReminderBody = "Time for a glass. Tap a drop in Purrch to log it.";
+    private const string WaterReminderGroup = "water";
+    /// Eight hours of reminders queued with Windows at a time.
+    private const int WaterReminderQueue = 16;
     private static readonly TimeSpan WaterInterval = TimeSpan.FromMinutes(30);
 
     public static TimerService Shared { get; } = new();
@@ -74,9 +77,13 @@ public sealed class TimerService
         _loading = false;
 
         _ticker.Tick += (_, _) => Tick();
-        _waterReminder.Tick += (_, _) =>
-            TrayIcon.Current?.Notify(WaterReminderTitle, "Time for a glass. Tap a drop in Purrch to log it.");
-        if (_waterEnabled) _waterReminder.Start();
+        // Windows delivers the queued reminders; while Purrch runs it keeps the queue topped up.
+        _waterReminder.Tick += (_, _) => QueueWaterReminders();
+        if (_waterEnabled)
+        {
+            QueueWaterReminders();
+            _waterReminder.Start();
+        }
 
         LiveActivityHub.Shared.Register(() =>
             LiveLabel is { } label ? new LiveActivity(LiveActivityKind.Timer, label, LiveGlyph) : null);
@@ -304,7 +311,7 @@ public sealed class TimerService
         set { _waterGoal = Math.Max(1, value); SaveWater(); StateChanged?.Invoke(); }
     }
 
-    /// Reminds every 30 minutes with a Windows notification while Purrch runs.
+    /// Reminds every 30 minutes with a Windows notification, also while Purrch isn't running.
     public bool WaterEnabled
     {
         get => _waterEnabled;
@@ -312,7 +319,16 @@ public sealed class TimerService
         {
             if (_waterEnabled == value) return;
             _waterEnabled = value;
-            if (value) _waterReminder.Start(); else _waterReminder.Stop();
+            if (value)
+            {
+                QueueWaterReminders();
+                _waterReminder.Start();
+            }
+            else
+            {
+                _waterReminder.Stop();
+                Toasts.Unschedule(WaterReminderGroup);
+            }
             SaveWater();
             StateChanged?.Invoke();
         }
@@ -325,6 +341,21 @@ public sealed class TimerService
         Glasses = Math.Clamp(index + 1 == Glasses ? index : index + 1, 0, _waterGoal);
         SaveWater();
         StateChanged?.Invoke();
+    }
+
+    /// Tops the queue of scheduled reminders back up to 16, continuing 30 minutes after the last one
+    /// still waiting, so restarting Purrch doesn't shift the rhythm. With none left, they start from now.
+    private static void QueueWaterReminders()
+    {
+        var queued = Toasts.Scheduled(WaterReminderGroup);
+        var next = queued.Count > 0 ? queued[^1] : DateTimeOffset.Now;
+        var times = new List<DateTimeOffset>();
+        for (var i = queued.Count; i < WaterReminderQueue; i++)
+        {
+            next += WaterInterval;
+            times.Add(next);
+        }
+        Toasts.Schedule(WaterReminderGroup, WaterReminderTitle, WaterReminderBody, ModuleId.Timers, times);
     }
 
     private void RolloverWaterDay()
@@ -395,7 +426,7 @@ public sealed class TimerService
     private static void Finish(string title, string body)
     {
         PlayChime();
-        TrayIcon.Current?.Notify(title, body);
+        Toasts.Show(title, body, ModuleId.Timers);
         if (AppSettings.Shared.IsEnabled(ModuleId.Timers)) NotchState.Shared.Present(ModuleId.Timers);
     }
 

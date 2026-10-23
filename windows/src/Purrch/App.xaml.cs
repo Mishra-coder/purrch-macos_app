@@ -37,6 +37,9 @@ public partial class App : Application
 
         var theme = AppSettings.Shared.Theme;
         ThemeResources.Apply(theme, theme.Accent);
+        // Before the timers schedule anything, so a notification click that launched Purrch isn't missed.
+        // The panel opens on its module once startup has finished.
+        Toasts.Start();
         new NotchWindow().Show();
         _tray = new TrayIcon();
         BackgroundServices.Start();

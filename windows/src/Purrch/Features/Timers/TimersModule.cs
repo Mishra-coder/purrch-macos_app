@@ -10,10 +10,13 @@ namespace Purrch.Features.Timers;
 /// Pomodoro, countdown, stopwatch and water, side by side like the Mac module.
 public sealed class TimersModule : Grid
 {
+    private const double FilledDropScale = 1.08;
+
     private readonly TimerService _timers = TimerService.Shared;
 
     // Pomodoro
-    private readonly Ring _pomoRing = new() { Width = 136, Height = 136 };
+    private readonly Ring _pomoTrack = new() { Width = 136, Height = 136 };
+    private readonly Ring _pomoRing = new() { Width = 136, Height = 136, Track = Brushes.Transparent };
     private readonly TextBlock _pomoTime = Big(34);
     private readonly TextBlock _pomoPhase = Ui.Text("", 12, ThemeResources.SecondaryText);
     private readonly TextBlock _pomoDone = Ui.Text("", 11, ThemeResources.SecondaryText);
@@ -37,6 +40,8 @@ public sealed class TimersModule : Grid
     private readonly ContentControl _waterSwitch = new();
     private readonly StackPanel _drops = Row(6);
     private readonly TextBlock _waterHint = Ui.Text("", 10, ThemeResources.SecondaryText);
+    /// Glasses the drops showed last time, so only the drops that changed animate.
+    private int? _shownGlasses;
 
     public TimersModule()
     {
@@ -93,7 +98,10 @@ public sealed class TimersModule : Grid
     private UIElement PomodoroCard()
     {
         var face = new Grid { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 10) };
+        // The track sits in its own ring so that only the arc glows.
+        face.Children.Add(_pomoTrack);
         face.Children.Add(_pomoRing);
+        if (Glow is { } glow) _pomoRing.Effect = ExpandedView.Glow(glow, 6);
         var labels = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         _pomoTime.HorizontalAlignment = HorizontalAlignment.Center;
         _pomoPhase.HorizontalAlignment = HorizontalAlignment.Center;
@@ -116,6 +124,7 @@ public sealed class TimersModule : Grid
     private UIElement CountdownCard()
     {
         _countTime.HorizontalAlignment = HorizontalAlignment.Center;
+        _countTime.RenderTransform = new TranslateTransform();
         _presets.HorizontalAlignment = HorizontalAlignment.Center;
         _countButtons.HorizontalAlignment = HorizontalAlignment.Center;
         _wave.Margin = new Thickness(0, 10, 0, 0);
@@ -265,8 +274,9 @@ public sealed class TimersModule : Grid
         for (var i = 0; i < t.WaterGoal; i++)
         {
             var index = i;
-            _drops.Children.Add(Ui.Bare(DropShape.Make(filled: i < t.Glasses), () => t.TapDrop(index)));
+            _drops.Children.Add(Ui.Bare(WaterDrop(i < t.Glasses, i < (_shownGlasses ?? t.Glasses)), () => t.TapDrop(index)));
         }
+        _shownGlasses = t.Glasses;
         _waterHint.Text = t.WaterEnabled
             ? "Tap a drop after each glass. Reminding you every 30 min."
             : "Tap a drop after each glass. Turn on for 30 min reminders.";
@@ -282,13 +292,49 @@ public sealed class TimersModule : Grid
 
         var remaining = t.CountdownRemaining;
         var total = t.CountdownActive ? t.CountdownTotal : t.CustomMinutes * 60;
-        _countTime.Text = Format.Duration(Math.Ceiling(remaining));
+        SetCountdownText(Format.Duration(Math.Ceiling(remaining)));
         _wave.Progress = total > 0 ? 1 - remaining / total : 0;
         _wave.Animating = t.CountdownRunning;
         _wave.InvalidateVisual();
 
         _swTime.Text = StopwatchFormat(t.StopwatchElapsed);
     }
+
+    /// New digits drop in from above and fade up, like the Mac app's counting-down number transition.
+    private void SetCountdownText(string text)
+    {
+        if (_countTime.Text == text) return;
+        var first = _countTime.Text.Length == 0;
+        _countTime.Text = text;
+        if (first || _countTime.RenderTransform is not TranslateTransform slide) return;
+        slide.Y = -8;
+        slide.Animate(TranslateTransform.YProperty, 0, Motion.ExpoOut(0.3));
+        _countTime.Opacity = 0.35;
+        _countTime.Animate(OpacityProperty, 1, Motion.ExpoOut(0.3));
+    }
+
+    /// A water drop; a filled one sits slightly larger and glows in glow themes. Drops that just
+    /// filled or emptied spring to their new size.
+    private static UIElement WaterDrop(bool filled, bool wasFilled)
+    {
+        var drop = DropShape.Make(filled);
+        var scale = new ScaleTransform(wasFilled ? FilledDropScale : 1, wasFilled ? FilledDropScale : 1);
+        drop.RenderTransformOrigin = new Point(0.5, 0.5);
+        drop.RenderTransform = scale;
+        if (filled != wasFilled)
+        {
+            scale.Animate(ScaleTransform.ScaleXProperty, filled ? FilledDropScale : 1, Motion.Pop);
+            scale.Animate(ScaleTransform.ScaleYProperty, filled ? FilledDropScale : 1, Motion.Pop);
+        }
+        if (filled && Glow is { } glow) drop.Effect = ExpandedView.Glow(glow, 3);
+        return drop;
+    }
+
+    /// The accent to glow with in glow themes, otherwise null.
+    private static Color? Glow =>
+        AppSettings.Shared.Theme.Glow && Application.Current.Resources[ThemeResources.Accent] is SolidColorBrush accent
+            ? accent.Color
+            : null;
 
     // MARK: - Helpers
 
