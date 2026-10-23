@@ -31,6 +31,7 @@ public sealed class AppSettings : INotifyPropertyChanged
         public string PlausibleSite { get; set; } = "";
         public string PlausibleHost { get; set; } = "https://plausible.io";
         public string MicrosoftClientId { get; set; } = "";
+        public string GoogleClientId { get; set; } = "";
     }
 
     private static readonly JsonSerializerOptions Json = new()
@@ -171,6 +172,13 @@ public sealed class AppSettings : INotifyPropertyChanged
     {
         get => _data.MicrosoftClientId;
         set { if (_data.MicrosoftClientId != value) { _data.MicrosoftClientId = value; Changed(); } }
+    }
+
+    /// Client ID of the user's own Google "Desktop app" OAuth client; its secret is in Credential Manager.
+    public string GoogleClientId
+    {
+        get => _data.GoogleClientId;
+        set { if (_data.GoogleClientId != value) { _data.GoogleClientId = value; Changed(); } }
     }
 
     /// Lives in the registry, not settings.json, so Task Manager's Startup tab and this toggle agree.

@@ -86,7 +86,7 @@ public sealed class CalendarService
     private readonly Data _data = Store.Load<Data>("calendar");
     private readonly Dictionary<Guid, string> _errors = new();
     private readonly DispatcherTimer _timer = new() { Interval = RefreshInterval };
-    private readonly List<CalendarAccount> _accounts = new() { new MicrosoftAccount() };
+    private readonly List<CalendarAccount> _accounts = new() { new MicrosoftAccount(), new GoogleAccount() };
     /// Each account's last read, also kept in calendar-cache so it shows offline.
     private readonly Dictionary<AccountKind, AccountData> _accountData = new();
     private readonly Dictionary<AccountKind, string> _accountErrors = new();
@@ -595,6 +595,7 @@ public sealed class CalendarService
         AccountKind? kind = e.PropertyName switch
         {
             nameof(AppSettings.MicrosoftClientId) => AccountKind.Microsoft,
+            nameof(AppSettings.GoogleClientId) => AccountKind.Google,
             _ => null,
         };
         if (kind is not { } changed) return;
