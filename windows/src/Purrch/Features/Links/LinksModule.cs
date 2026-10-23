@@ -332,12 +332,7 @@ internal sealed class SiteTile : Grid
     private static ContextMenu Menu(SavedSite site, LinksModule module)
     {
         var menu = new ContextMenu();
-        void Add(string header, Action action)
-        {
-            var entry = new MenuItem { Header = header };
-            entry.Click += (_, _) => action();
-            menu.Items.Add(entry);
-        }
+        void Add(string header, Action action) => menu.Items.Add(Ui.MenuEntry(header, action));
         Add("Open", () => LinksModule.Open(site));
         Add("Copy Link", () =>
         {
@@ -346,7 +341,7 @@ internal sealed class SiteTile : Grid
         });
         Add("Edit…", () => module.Edit(site, isNew: false));
         menu.Items.Add(new Separator());
-        Add("Remove", () => module.Remove(site));
+        menu.Items.Add(Ui.MenuEntry("Remove", () => module.Remove(site), destructive: true));
         return menu;
     }
 }

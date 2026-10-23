@@ -128,12 +128,16 @@ public sealed class LinksStore
     }
 }
 
-/// Site icons from Google's favicon service, kept in memory for the session.
-/// A site without one, or no network, leaves the tile showing its first letter.
+/// Site icons from Google's favicon service, kept in memory and in %APPDATA%\Purrch\favicons, so they
+/// show at once and offline after the first visit (the Mac app gets the same from its URL cache).
+/// A site without one, or no network the first time, leaves the tile showing its first letter.
 public static class Favicons
 {
+    /// Older icons are fetched again, in case the site changed its icon; the old one stays if that fails.
+    private static readonly TimeSpan MaxAge = TimeSpan.FromDays(14);
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
     private static readonly Dictionary<string, Task<ImageSource?>> Cache = new();
+    private static readonly string Folder = Path.Combine(AppPaths.Root, "favicons");
 
     /// Call on the UI thread; the result arrives on it too.
     public static Task<ImageSource?> Get(string host)
@@ -149,13 +153,53 @@ public static class Favicons
 
     private static async Task<ImageSource?> Fetch(string host)
     {
+        // "localhost:3000" can't be a file name as it is.
+        var file = Path.Combine(Folder, string.Concat(host.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)) + ".png");
+        var saved = await Read(file);
+        if (saved.Image != null && DateTime.UtcNow - saved.Written < MaxAge) return saved.Image;
         try
         {
             var url = $"https://www.google.com/s2/favicons?domain={Uri.EscapeDataString(host)}&sz=64";
             using var response = await Http.GetAsync(url);
             // Unknown sites get a generic globe with a 404; the letter looks better than that.
-            if (!response.IsSuccessStatusCode) return null;
+            if (!response.IsSuccessStatusCode) return saved.Image;
             var bytes = await response.Content.ReadAsByteArrayAsync();
+            if (Decode(bytes) is not { } image) return saved.Image;
+            try
+            {
+                Directory.CreateDirectory(Folder);
+                await File.WriteAllBytesAsync(file, bytes);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                Log.Write($"Couldn't keep the icon of {host}: {e.Message}");
+            }
+            return image;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or IOException
+                                      or NotSupportedException or ArgumentException or InvalidOperationException)
+        {
+            return saved.Image;
+        }
+    }
+
+    private static async Task<(ImageSource? Image, DateTime Written)> Read(string file)
+    {
+        try
+        {
+            if (!File.Exists(file)) return (null, default);
+            return (Decode(await File.ReadAllBytesAsync(file)), File.GetLastWriteTimeUtc(file));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return (null, default);
+        }
+    }
+
+    private static ImageSource? Decode(byte[] bytes)
+    {
+        try
+        {
             var image = new BitmapImage();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
@@ -164,8 +208,8 @@ public static class Favicons
             image.Freeze();
             return image;
         }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or IOException
-                                      or NotSupportedException or ArgumentException or InvalidOperationException)
+        catch (Exception e) when (e is NotSupportedException or FileFormatException or ArgumentException
+                                      or InvalidOperationException or IOException)
         {
             return null;
         }
