@@ -12,7 +12,7 @@ namespace Purrch.Interface;
 /// Settings: a section list on the left, the section's rows on the right.
 public sealed class SettingsView : Grid
 {
-    public enum Section { Appearance, Behaviour, Modules, AI, Integrations, About }
+    public enum Section { Appearance, Behaviour, Modules, AI, Integrations, Permissions, About }
 
     /// Remembered across openings, like the Mac app's @State while the panel lives.
     private static Section _section = Section.Appearance;
@@ -69,6 +69,7 @@ public sealed class SettingsView : Grid
         Section.Modules => "\uF0E2",
         Section.AI => "\uE945",
         Section.Integrations => "\uE8D7",
+        Section.Permissions => "\uE72E",
         _ => "\uE946",
     };
 
@@ -88,7 +89,7 @@ public sealed class SettingsView : Grid
                     _settings.OpenOnHover, v => _settings.OpenOnHover = v));
                 Add(Toggle("Hide in full screen", "Get out of the way of full-screen apps, games and videos.",
                     _settings.HideInFullscreen, v => _settings.HideInFullscreen = v));
-                Add(Toggle("Live activities", "Music, timers and downloads in the closed pill.",
+                Add(Toggle("Live activities", "Messages, timers, downloads and music in the closed pill.",
                     _settings.ShowLiveActivities, v => _settings.ShowLiveActivities = v));
                 Add(Toggle("Launch at startup", "Start Purrch automatically when you sign in to Windows.",
                     _settings.LaunchAtStartup, v => _settings.LaunchAtStartup = v));
@@ -101,6 +102,9 @@ public sealed class SettingsView : Grid
                 break;
             case Section.Integrations:
                 BuildIntegrations();
+                break;
+            case Section.Permissions:
+                BuildPermissions();
                 break;
             case Section.About:
                 BuildAbout();
@@ -289,6 +293,35 @@ public sealed class SettingsView : Grid
         stack.Children.Add(Ui.Text(title, 11, ThemeResources.SecondaryText));
         stack.Children.Add(frame);
         return stack;
+    }
+
+    /// Windows' counterparts of the Mac's privacy panes. Media control, files and the clipboard need none.
+    private void BuildPermissions()
+    {
+        Add(Ui.Text("Everything stays on this PC. Grant only what you use.", 12, ThemeResources.SecondaryText));
+        Add(Permission("Location", "Local weather (a city in Integrations works without it)", "ms-settings:privacy-location"));
+        Add(Permission("Notifications", "Timer and water reminders", "ms-settings:notifications"));
+        Add(Permission("Startup apps", "Launch at startup", "ms-settings:startupapps"));
+        Add(Ui.Text("Now Playing, Clipboard, Downloads, Captures and Screen Time need no permission on Windows.",
+            11, ThemeResources.SecondaryText));
+    }
+
+    private static UIElement Permission(string title, string detail, string page)
+    {
+        var labels = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        labels.Children.Add(Ui.Text(title, 13));
+        labels.Children.Add(Ui.Text(detail, 11, ThemeResources.SecondaryText));
+        var open = Ui.Pill("Open", "\uE8A7", () =>
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(page) { UseShellExecute = true }); }
+            catch (System.ComponentModel.Win32Exception e) { Log.Write($"Settings page {page}: {e.Message}"); }
+        });
+        open.VerticalAlignment = VerticalAlignment.Center;
+        var row = new DockPanel();
+        DockPanel.SetDock(open, Dock.Right);
+        row.Children.Add(open);
+        row.Children.Add(labels);
+        return Ui.Row(row);
     }
 
     private void BuildAbout()

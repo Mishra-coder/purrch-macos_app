@@ -83,6 +83,7 @@ None of this has run on a real Windows machine yet. Please go through the list a
 - [ ] Each of the six themes recolours the panel at once. Playful gives each module its own colour.
 - [ ] Settings → Modules: turning modules off removes them from the tab bar, and **Reset order** works. Home can't be turned off.
 - [ ] Settings → Behaviour: with **Open on hover** off, the panel only opens on click.
+- [ ] Settings → Permissions: **Open** next to Location, Notifications and Startup apps opens that page of Windows Settings.
 
 **Home**
 
