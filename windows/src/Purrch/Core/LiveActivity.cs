@@ -2,6 +2,7 @@ using System.Windows.Media;
 
 namespace Purrch.Core;
 
+/// In priority order: when several have something to show, the earliest kind wins.
 public enum LiveActivityKind { None, Message, Timer, Download, Music }
 
 /// What the closed pill shows: a scrolling message across it, or on either side a running timer, a download, or music.
@@ -20,8 +21,8 @@ public sealed record LiveActivity(LiveActivityKind Kind, string Label = "", stri
 }
 
 /// Collects live activities from the services that produce them (message, timers, downloads, media).
-/// Sources are asked in the order they registered (ones registered <c>first</c> go ahead of the rest);
-/// the first one with something to show wins.
+/// The pill shows the highest-priority one (see <see cref="LiveActivityKind"/>), whatever order the
+/// services started in, as on the Mac: message, then timer, then download, then music.
 public sealed class LiveActivityHub
 {
     public static LiveActivityHub Shared { get; } = new();
@@ -31,10 +32,9 @@ public sealed class LiveActivityHub
     /// Raised when a source's activity may have changed; listeners re-read <see cref="Current"/>.
     public event Action? Changed;
 
-    public void Register(Func<LiveActivity?> source, bool first = false)
+    public void Register(Func<LiveActivity?> source)
     {
-        if (first) _sources.Insert(0, source);
-        else _sources.Add(source);
+        _sources.Add(source);
         Refresh();
     }
 
@@ -45,9 +45,12 @@ public sealed class LiveActivityHub
         get
         {
             if (!AppSettings.Shared.ShowLiveActivities) return LiveActivity.None;
+            var best = LiveActivity.None;
             foreach (var source in _sources)
-                if (source() is { Kind: not LiveActivityKind.None } activity) return activity;
-            return LiveActivity.None;
+                if (source() is { Kind: not LiveActivityKind.None } activity
+                    && (best.Kind == LiveActivityKind.None || activity.Kind < best.Kind))
+                    best = activity;
+            return best;
         }
     }
 }

@@ -14,7 +14,6 @@ public static class BackgroundServices
     {
         _ = MessageService.Shared;
         _ = TimerService.Shared;
-        // Registers its live activity after timers and before music, so the pill prefers them in that order.
         DownloadsService.Shared.Start();
         ClipboardService.Shared.Start();
         NowPlayingService.Shared.Start();

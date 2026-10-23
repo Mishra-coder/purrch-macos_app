@@ -27,9 +27,9 @@ public sealed class MessageService
         _saved = Store.Load<Saved>("message");
         if (_saved.Text.Length > MaxLength) _saved.Text = _saved.Text[..MaxLength];
         _saver = new DebouncedSaver(TimeSpan.FromSeconds(0.6), () => Store.Save("message", _saved));
-        // Takes priority over timers and music while on.
+        // Takes priority over timers and music while on (the hub ranks by kind).
         LiveActivityHub.Shared.Register(() =>
-            IsShowing ? new LiveActivity(LiveActivityKind.Message, _saved.Text) : null, first: true);
+            IsShowing ? new LiveActivity(LiveActivityKind.Message, _saved.Text) : null);
     }
 
     public string Text
